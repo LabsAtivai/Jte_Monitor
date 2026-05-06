@@ -90,18 +90,3 @@ export class ProcessosController {
     return row;
   }
 }
-
-  @Get("stats")
-  async stats() {
-    const [[row]] = await this.db.query<any>(`
-      SELECT
-        COUNT(*)              AS total,
-        COUNT(DISTINCT vara)  AS totalVaras,
-        MIN(dataISO)          AS dataMin,
-        MAX(dataISO)          AS dataMax,
-        (SELECT iniciadoEm FROM execucoes ORDER BY id DESC LIMIT 1) AS ultimaExecucao
-      FROM processos_sem_polo_passivo`
-    );
-    return row;
-  }
-}

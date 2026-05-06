@@ -8,7 +8,7 @@
 //  CONCURRENCY=5 node worker/index.js
 //  MESES=3 node worker/index.js
 // ================================================================
-require("dotenv").config({ path: "../.env" });
+require("dotenv").config({ path: "/root/jte-monitor/backend/.env" });
 
 const { Queue, Worker } = require("bullmq");
 const { chromium }      = require("playwright");

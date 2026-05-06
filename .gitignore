@@ -1,8 +1,9 @@
-node_modules/
-dist/
+﻿node_modules/
+.next/
 .env
-backend/.env
-frontend/.env.local
+.env.local
 *.log
-.DS_Store
-frontend/.next/
+output/
+dist/
+build/
+.env.production
