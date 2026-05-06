@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+
+  jte-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jte-api
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES}
+      JWT_REFRESH_DAYS: ${JWT_REFRESH_DAYS}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      MAIL_FROM: ${MAIL_FROM}
+      PORT: 4000
+      NODE_ENV: production
+      FRONTEND_URL: ${FRONTEND_URL}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+    ports:
+      - "4000:4000"
+    networks:
+      - jte-network
+
+  jte-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: jte-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "3085:3085"
+    depends_on:
+      - jte-api
+    networks:
+      - jte-network
+
+networks:
+  jte-network:
+    driver: bridge
