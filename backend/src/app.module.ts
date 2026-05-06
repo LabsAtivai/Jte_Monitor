@@ -11,6 +11,7 @@ import { AuthService, JwtStrategy } from "./auth/auth.service";
 import { AuthController }      from "./auth/auth.controller";
 import { ProcessosController } from "./processos/processos.controller";
 import { AlertasController, AlertasService } from "./alertas/alertas.controller";
+import { ContatosController }  from "./contatos/contatos.controller";
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { AlertasController, AlertasService } from "./alertas/alertas.controller"
       }),
     }),
   ],
-  controllers: [AuthController, ProcessosController, AlertasController],
+  controllers: [AuthController, ProcessosController, AlertasController, ContatosController],
   providers: [
     DbService, UsersService, AuthService, JwtStrategy, AlertasService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },

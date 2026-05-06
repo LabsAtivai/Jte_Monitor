@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS contatos_reclamadas (
+  id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  cnpj             VARCHAR(20)     NULL,
+  razaoSocial      VARCHAR(500)    NULL,
+  nomeFantasia     VARCHAR(500)    NULL,
+  email            VARCHAR(255)    NULL,
+  qualidadeEmail   ENUM('alta','media','baixa') NULL,
+  telefone         VARCHAR(50)     NULL,
+  reclamada        VARCHAR(500)    NOT NULL,
+  numeroProcesso   VARCHAR(64)     NOT NULL,
+  vara             VARCHAR(255)    NULL,
+  dataBR           VARCHAR(10)     NULL,
+  dataISO          DATE            NULL,
+  createdAt        TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt        TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_contato (numeroProcesso, email),
+  KEY ix_email (email),
+  KEY ix_reclamada (reclamada(100)),
+  KEY ix_qualidade (qualidadeEmail)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
