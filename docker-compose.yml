@@ -9,25 +9,25 @@ services:
     container_name: jte-api
     restart: unless-stopped
     environment:
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
-      DB_NAME: ${DB_NAME}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES}
-      JWT_REFRESH_DAYS: ${JWT_REFRESH_DAYS}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_SECURE: ${SMTP_SECURE}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      MAIL_FROM: ${MAIL_FROM}
+      DB_HOST: 172.17.0.1
+      DB_PORT: 3306
+      DB_USER: jte
+      DB_PASS: Z@ry1548
+      DB_NAME: jtemonitor
+      JWT_SECRET: c3d042c47ea7252334c568a5f5d007b50a388f528825b85c40a116bcb63409a16c4577716e0b1a22bad55b208ee4e46bb908d89a4a53a91da33603b3b988881c
+      JWT_ACCESS_EXPIRES: 15m
+      JWT_REFRESH_DAYS: 7
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_SECURE: "false"
+      SMTP_USER: ""
+      SMTP_PASS: ""
+      MAIL_FROM: "JTe Monitor <noreply@ativa.law>"
       PORT: 4000
       NODE_ENV: production
-      FRONTEND_URL: ${FRONTEND_URL}
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
+      FRONTEND_URL: https://ativa.law
+      REDIS_HOST: 172.17.0.1
+      REDIS_PORT: 6379
     ports:
       - "4000:4000"
     networks:
@@ -40,7 +40,9 @@ services:
     container_name: jte-frontend
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_API_URL: https://api.ativa.law
+      PORT: 3085
+      HOSTNAME: "0.0.0.0"
     ports:
       - "3085:3085"
     depends_on:
