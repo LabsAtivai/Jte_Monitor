@@ -40,7 +40,7 @@ export class ContatosController {
 
     const [rows] = await this.db.query<any[]>(
       `SELECT id, email, qualidadeEmail, reclamada, razaoSocial, nomeFantasia,
-              numeroProcesso, cnpj, vara, dataBR, telefone
+              numeroProcesso, cnpj, vara, dataBR, telefone, socioNome, socioQualificacao
        FROM contatos_reclamadas ${where}
        ORDER BY
          CASE qualidadeEmail WHEN 'alta' THEN 1 WHEN 'media' THEN 2 ELSE 3 END,

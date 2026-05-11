@@ -229,7 +229,7 @@ function AbaContatos({ authFetch }) {
     if (!rows.length) return;
     const headers = ["Email","Qualidade","Reclamada","Razão Social","Nº Processo","CNPJ","Vara","Data","Telefone"];
     const esc = v => { if (!v) return ""; const s = String(v); return /[;"'\n\r]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
-    const csv = [headers.join(";"), ...rows.map(r => [r.email, r.qualidadeEmail, r.reclamada, r.nomeFantasia||r.razaoSocial, r.numeroProcesso, r.cnpj, r.vara, r.dataBR, r.telefone].map(esc).join(";"))].join("\n");
+    const csv = [headers.join(";"), ...rows.map(r => [r.email, r.qualidadeEmail, r.reclamada, r.nomeFantasia||r.razaoSocial, r.socioNome, r.socioQualificacao, r.numeroProcesso, r.cnpj, r.vara, r.dataBR, r.telefone].map(esc).join(";"))].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -285,7 +285,7 @@ function AbaContatos({ authFetch }) {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
-                  <tr>{["Email","Qualidade","Reclamada","Razão Social","Nº Processo","CNPJ"].map(h => (
+                  <tr>{["Email","Qualidade","Reclamada","Razão Social","Sócio / Cargo","Nº Processo","CNPJ"].map(h => (
                     <th key={h} style={{ padding: "10px 14px", textAlign: "left", background: "#f8fafc", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>{h}</th>
                   ))}</tr>
                 </thead>
@@ -296,6 +296,9 @@ function AbaContatos({ authFetch }) {
                       <td style={TD}><QualidadeBadge q={r.qualidadeEmail} /></td>
                       <td style={{ ...TD, fontWeight: 500 }}>{r.reclamada || "—"}</td>
                       <td style={{ ...TD, color: "#6b7280", fontSize: 12 }}>{r.nomeFantasia || r.razaoSocial || "—"}</td>
+                      <td style={TD}>
+                        {r.socioNome ? <><div style={{fontWeight:500,fontSize:12}}>{r.socioNome}</div><div style={{fontSize:11,color:"#9ca3af"}}>{r.socioQualificacao||""}</div></> : "—"}
+                      </td>
                       <td style={{ ...TD, fontFamily: "monospace", fontSize: 12 }}>{r.numeroProcesso}<CopiarBtn texto={r.numeroProcesso} /></td>
                       <td style={{ ...TD, fontFamily: "monospace", fontSize: 12, color: "#6b7280" }}>{r.cnpj ? r.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") : "—"}</td>
                     </tr>
