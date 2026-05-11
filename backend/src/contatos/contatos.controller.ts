@@ -49,16 +49,16 @@ export class ContatosController {
       [...p, POR_PAGINA, offset]
     );
 
-    const [varas] = await this.db.query<any[]>(
+    const [varasResult] = await this.db.query<any[]>(
       "SELECT DISTINCT vara FROM contatos_reclamadas WHERE vara IS NOT NULL ORDER BY vara"
     );
 
     return {
-      rows,
+      rows:         Array.isArray(rows) ? rows : [],
       total,
       pagina,
       totalPaginas: Math.ceil(total / POR_PAGINA),
-      varas: varas.map((v: any) => v.vara),
+      varas:        Array.isArray(varasResult) ? varasResult.map((v: any) => v.vara) : [],
       isPremium,
     };
   }
@@ -67,11 +67,11 @@ export class ContatosController {
   async stats() {
     const [[row]] = await this.db.query<any>(`
       SELECT
-        COUNT(*)                     AS total,
-        SUM(qualidadeEmail = 'alta') AS totalAlta,
-        SUM(qualidadeEmail = 'media')AS totalMedia,
-        SUM(qualidadeEmail = 'baixa')AS totalBaixa,
-        COUNT(DISTINCT reclamada)    AS totalEmpresas
+        COUNT(*)                      AS total,
+        SUM(qualidadeEmail = 'alta')  AS totalAlta,
+        SUM(qualidadeEmail = 'media') AS totalMedia,
+        SUM(qualidadeEmail = 'baixa') AS totalBaixa,
+        COUNT(DISTINCT reclamada)     AS totalEmpresas
       FROM contatos_reclamadas
       WHERE email IS NOT NULL AND email != ''
     `);
