@@ -77,17 +77,18 @@ async function snovGet(path, params = {}) {
 }
 
 // ── Polling helper ────────────────────────────────────────────
-async function pollResult(getUrl, maxTentativas = 10, delayMs = 2000) {
+async function pollResult(getUrl, maxTentativas = 20, delayMs = 4000) {
   for (let i = 0; i < maxTentativas; i++) {
     const res = await snovGet(getUrl);
     if (res.status === "completed") return res;
-    if (res.status === "in progress" || !res.status) {
+    if (res.status === "in progress" || res.status === "in_progress" || !res.status) {
       await new Promise(r => setTimeout(r, delayMs));
       continue;
     }
     throw new Error(`Status inesperado: ${res.status}`);
   }
-  throw new Error("Timeout aguardando resultado Snov.io");
+  // Timeout — retorna vazio em vez de erro
+  return { data: [], status: "timeout" };
 }
 
 // ── Domain search completo ────────────────────────────────────
@@ -286,7 +287,7 @@ async function main() {
     }
 
     processados++;
-    await new Promise(r => setTimeout(r, 500)); // rate limit
+    await new Promise(r => setTimeout(r, 1500)); // rate limit
   }
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(0);

@@ -77,7 +77,7 @@ export default function DashboardPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>JTe Monitor</div>
           <div style={{ display: "flex", gap: 4 }}>
-            {[{ key: "processos", label: "Processos" }, { key: "contatos", label: "Contatos" }, { key: "snov", label: "Contatos Snov.io" }].map(a => (
+            {[{ key: "processos", label: "Processos" }, { key: "contatos", label: "Contatos" }, { key: "snov", label: "Contatos Enriquecidos" }].map(a => (
               <button key={a.key} onClick={() => setAba(a.key)} style={{ background: aba === a.key ? "rgba(255,255,255,0.15)" : "transparent", color: "#fff", border: "none", borderRadius: 6, padding: "6px 16px", fontSize: 13, fontWeight: aba === a.key ? 700 : 400, cursor: "pointer", borderBottom: aba === a.key ? "2px solid #f59e0b" : "2px solid transparent" }}>{a.label}</button>
             ))}
           </div>
