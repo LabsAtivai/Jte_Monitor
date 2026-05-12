@@ -5,13 +5,14 @@ import { JwtModule }      from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD }      from "@nestjs/core";
-import { DbService }           from "./common/db.service";
-import { UsersService }        from "./users/users.service";
+import { DbService }                from "./common/db.service";
+import { UsersService }             from "./users/users.service";
 import { AuthService, JwtStrategy } from "./auth/auth.service";
-import { AuthController }      from "./auth/auth.controller";
-import { ProcessosController } from "./processos/processos.controller";
+import { AuthController }           from "./auth/auth.controller";
+import { ProcessosController }      from "./processos/processos.controller";
 import { AlertasController, AlertasService } from "./alertas/alertas.controller";
-import { ContatosController }  from "./contatos/contatos.controller";
+import { ContatosController }       from "./contatos/contatos.controller";
+import { ContatosSnovController }   from "./contatos/contatos-snov.controller";
 
 @Module({
   imports: [
@@ -27,7 +28,13 @@ import { ContatosController }  from "./contatos/contatos.controller";
       }),
     }),
   ],
-  controllers: [AuthController, ProcessosController, AlertasController, ContatosController],
+  controllers: [
+    AuthController,
+    ProcessosController,
+    AlertasController,
+    ContatosController,
+    ContatosSnovController,
+  ],
   providers: [
     DbService, UsersService, AuthService, JwtStrategy, AlertasService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },

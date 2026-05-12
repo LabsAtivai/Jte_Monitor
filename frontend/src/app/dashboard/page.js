@@ -77,7 +77,7 @@ export default function DashboardPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>JTe Monitor</div>
           <div style={{ display: "flex", gap: 4 }}>
-            {[{ key: "processos", label: "Processos" }, { key: "contatos", label: "Contatos" }].map(a => (
+            {[{ key: "processos", label: "Processos" }, { key: "contatos", label: "Contatos" }, { key: "snov", label: "Contatos Snov.io" }].map(a => (
               <button key={a.key} onClick={() => setAba(a.key)} style={{ background: aba === a.key ? "rgba(255,255,255,0.15)" : "transparent", color: "#fff", border: "none", borderRadius: 6, padding: "6px 16px", fontSize: 13, fontWeight: aba === a.key ? 700 : 400, cursor: "pointer", borderBottom: aba === a.key ? "2px solid #f59e0b" : "2px solid transparent" }}>{a.label}</button>
             ))}
           </div>
@@ -93,6 +93,7 @@ export default function DashboardPage() {
       </header>
       {aba === "processos" && <AbaProcessos authFetch={authFetch} user={user} isPremium={isPremium} router={router} />}
       {aba === "contatos"  && <AbaContatos  authFetch={authFetch} />}
+      {aba === "snov"      && <AbaSnov      authFetch={authFetch} />}
     </div>
   );
 }
@@ -322,6 +323,199 @@ function AbaContatos({ authFetch }) {
     </div>
   );
 }
+
+// Componente AbaSnov — cole dentro do dashboard/page.js
+// e adicione <AbaSnov authFetch={authFetch} /> no render
+
+function AbaSnov({ authFetch }) {
+  const [dados,     setDados]     = useState(null);
+  const [loading,   setLoading]   = useState(false);
+  const [stats,     setStats]     = useState(null);
+  const [reclamada, setReclamada] = useState("");
+  const [dominio,   setDominio]   = useState("");
+  const [cargo,     setCargo]     = useState("");
+  const [tipo,      setTipo]      = useState("");
+  const [vara,      setVara]      = useState("");
+  const [pagina,    setPagina]    = useState(1);
+
+  const reclamadaDeb = useDebounce(reclamada, 400);
+  const dominioDeb   = useDebounce(dominio,   400);
+  const cargoDeb     = useDebounce(cargo,     400);
+
+  useEffect(() => {
+    authFetch(`${API}/api/contatos-snov/stats`).then(r => r.json()).then(setStats).catch(() => {});
+  }, []);
+
+  const buscar = useCallback(async (pg = 1) => {
+    setLoading(true);
+    try {
+      const q = new URLSearchParams();
+      if (reclamadaDeb) q.set("reclamada", reclamadaDeb);
+      if (dominioDeb)   q.set("dominio",   dominioDeb);
+      if (cargoDeb)     q.set("cargo",     cargoDeb);
+      if (tipo)         q.set("tipo",      tipo);
+      if (vara)         q.set("vara",      vara);
+      q.set("pagina", String(pg));
+      const res  = await authFetch(`${API}/api/contatos-snov?${q}`);
+      const json = await res.json();
+      setDados(json); setPagina(pg);
+    } finally { setLoading(false); }
+  }, [reclamadaDeb, dominioDeb, cargoDeb, tipo, vara, authFetch]);
+
+  useEffect(() => { buscar(1); }, [reclamadaDeb, dominioDeb, cargoDeb, tipo, vara]);
+
+  function exportarCSV() {
+    const rows = dados?.rows ?? [];
+    if (!rows.length) return;
+    const headers = ["Nome","Cargo","Email","Domínio","Tipo","Empresa","Cidade","Setor","Reclamada","Vara","LinkedIn"];
+    const esc = v => { if (!v) return ""; const s = String(v); return /[;"'\n\r]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
+    const csv = [
+      headers.join(";"),
+      ...rows.map(r => [
+        r.nomeCompleto, r.cargo, r.email, r.dominio, r.tipo,
+        r.companyName, r.companyCity, r.companyIndustry,
+        r.reclamada, r.vara, r.linkedinUrl
+      ].map(esc).join(";")),
+    ].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `contatos_snov_${Date.now()}.csv`; a.click(); URL.revokeObjectURL(url);
+  }
+
+  function TipoBadge({ tipo }) {
+    const map = {
+      prospect:     { label: "Prospect",    bg: "#dbeafe", color: "#1e40af" },
+      domain_email: { label: "Email corp.", bg: "#d1fae5", color: "#065f46" },
+      generic:      { label: "Genérico",    bg: "#f3f4f6", color: "#6b7280" },
+    };
+    const c = map[tipo] || map.generic;
+    return <span style={{ background: c.bg, color: c.color, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>{c.label}</span>;
+  }
+
+  const rows = dados?.rows ?? [];
+
+  return (
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
+
+      {/* Stats */}
+      {stats && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 20 }}>
+          {[
+            { label: "Total registros",  valor: Number(stats.total).toLocaleString("pt-BR"),          cor: "#1a3a5c" },
+            { label: "Prospects",        valor: Number(stats.totalProspects).toLocaleString("pt-BR"),  cor: "#1e40af" },
+            { label: "Emails corp.",     valor: Number(stats.totalDomainEmails).toLocaleString("pt-BR"),cor: "#065f46" },
+            { label: "Genéricos",        valor: Number(stats.totalGenericos).toLocaleString("pt-BR"),  cor: "#6b7280" },
+            { label: "Com email",        valor: Number(stats.totalComEmail).toLocaleString("pt-BR"),   cor: "#92400e" },
+            { label: "Domínios",         valor: Number(stats.totalDominios).toLocaleString("pt-BR"),   cor: "#7c3aed" },
+            { label: "Empresas",         valor: Number(stats.totalEmpresas).toLocaleString("pt-BR"),   cor: "#0f766e" },
+          ].map(s => (
+            <div key={s.label} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "14px 16px" }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: s.cor }}>{s.valor}</div>
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filtros */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "18px 20px", marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 12 }}>
+          <FiltroInput label="Reclamada"  value={reclamada} onChange={e => setReclamada(e.target.value)} placeholder="Nome da empresa..." />
+          <FiltroInput label="Domínio"    value={dominio}   onChange={e => setDominio(e.target.value)}   placeholder="empresa.com.br" />
+          <FiltroInput label="Cargo"      value={cargo}     onChange={e => setCargo(e.target.value)}     placeholder="Diretor, RH..." />
+          <FiltroSelect label="Tipo" value={tipo} onChange={e => setTipo(e.target.value)}>
+            <option value="">Todos os tipos</option>
+            <option value="prospect">Prospect (pessoa)</option>
+            <option value="domain_email">Email corporativo</option>
+            <option value="generic">Genérico</option>
+          </FiltroSelect>
+          <FiltroSelect label="Vara" value={vara} onChange={e => setVara(e.target.value)}>
+            <option value="">Todas as varas</option>
+            {dados?.varas?.map(v => <option key={v} value={v}>{v}</option>)}
+          </FiltroSelect>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => { setReclamada(""); setDominio(""); setCargo(""); setTipo(""); setVara(""); }}
+            style={{ background: "#fff", color: "#6b7280", border: "1px solid #d1d5db", borderRadius: 6, padding: "7px 14px", fontSize: 13, cursor: "pointer" }}
+          >
+            Limpar filtros
+          </button>
+          <button
+            onClick={exportarCSV} disabled={!rows.length}
+            style={{ background: rows.length ? "#1a3a5c" : "#e5e7eb", color: rows.length ? "#fff" : "#9ca3af", border: "none", borderRadius: 6, padding: "7px 16px", fontSize: 13, fontWeight: 500, cursor: rows.length ? "pointer" : "not-allowed" }}
+          >
+            ↓ Exportar CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+        {loading && <EstadoVazio>Carregando...</EstadoVazio>}
+        {!loading && rows.length === 0 && <EstadoVazio>Nenhum contato encontrado.</EstadoVazio>}
+        {!loading && rows.length > 0 && (
+          <>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    {["Tipo","Nome / Email","Cargo","Domínio","Empresa","Reclamada","Vara"].map(h => (
+                      <th key={h} style={{ padding: "10px 14px", textAlign: "left", background: "#f8fafc", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr key={r.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                      <td style={TD}><TipoBadge tipo={r.tipo} /></td>
+                      <td style={TD}>
+                        {r.nomeCompleto && <div style={{ fontWeight: 500, fontSize: 13 }}>{r.nomeCompleto}</div>}
+                        {r.email && (
+                          <div style={{ fontSize: 12, fontFamily: "monospace", color: "#6b7280" }}>
+                            {r.email}
+                            <CopiarBtn texto={r.email} />
+                          </div>
+                        )}
+                        {r.linkedinUrl && (
+                          <a href={r.linkedinUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#0a66c2" }}>LinkedIn ↗</a>
+                        )}
+                      </td>
+                      <td style={{ ...TD, color: "#374151", fontSize: 12 }}>{r.cargo || "—"}</td>
+                      <td style={{ ...TD, fontFamily: "monospace", fontSize: 12, color: "#6b7280" }}>
+                        {r.dominio}
+                        <CopiarBtn texto={r.dominio} />
+                      </td>
+                      <td style={{ ...TD, fontSize: 12 }}>
+                        {r.companyName && <div style={{ fontWeight: 500 }}>{r.companyName}</div>}
+                        {r.companyCity && <div style={{ color: "#9ca3af", fontSize: 11 }}>{r.companyCity}{r.companyIndustry ? ` · ${r.companyIndustry}` : ""}</div>}
+                        {r.companySize  && <div style={{ color: "#9ca3af", fontSize: 11 }}>{r.companySize} funcionários</div>}
+                      </td>
+                      <td style={{ ...TD, fontWeight: 500, fontSize: 12 }}>{r.reclamada || "—"}</td>
+                      <td style={{ ...TD, fontSize: 11, color: "#6b7280" }}>{r.vara || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {dados?.totalPaginas > 1 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderTop: "1px solid #e5e7eb", fontSize: 13, color: "#6b7280", flexWrap: "wrap", gap: 8 }}>
+                <span>{(pagina-1)*50+1}–{Math.min(pagina*50, dados.total)} de {dados.total}</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <BotaoPagina disabled={pagina <= 1} onClick={() => buscar(pagina - 1)}>← Anterior</BotaoPagina>
+                  <span style={{ padding: "7px 10px" }}>{pagina} / {dados.totalPaginas}</span>
+                  <BotaoPagina primary disabled={pagina >= dados.totalPaginas} onClick={() => buscar(pagina + 1)}>Próxima →</BotaoPagina>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function PainelAlertas({ authFetch }) {
   const [lista, setLista]     = useState([]);
