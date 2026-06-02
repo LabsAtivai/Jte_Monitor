@@ -7,19 +7,15 @@
 //  node worker/index.js --only-work      → só consome
 //  CONCURRENCY=5 node worker/index.js
 //  MESES=3 node worker/index.js
-//  VARAS=3 node worker/index.js          → limita a N varas (teste)
 // ================================================================
 require("dotenv").config({ path: "/root/jte-monitor/backend/.env" });
 
 const { Queue, Worker } = require("bullmq");
 const { chromium }      = require("playwright");
 const mysql             = require("mysql2/promise");
-const fs                = require("fs");
-const path              = require("path");
 
 const CONCURRENCY = Number(process.env.CONCURRENCY || 4);
 const MESES       = Number(process.env.MESES       || 6);
-const VARAS_LIMIT = Number(process.env.VARAS        || 0); // 0 = todas
 const ONLY_QUEUE  = process.argv.includes("--only-queue");
 const ONLY_WORK   = process.argv.includes("--only-work");
 const QUEUE_NAME  = "jte";
@@ -36,10 +32,6 @@ function brToIso(br) {
   return `${yyyy}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
 }
 function parseBR(br) { const [dd,mm,yyyy]=br.split("/").map(Number); return new Date(yyyy,mm-1,dd); }
-function hoje() {
-  const d=new Date();
-  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
-}
 function gerarDatas() {
   const i=new Date(); i.setMonth(i.getMonth()+1);
   const f=new Date(i); f.setMonth(f.getMonth()+MESES);
@@ -137,77 +129,6 @@ async function extrair(page){
   });
 }
 
-// ── FIX 1: Verificar polo passivo sem advogado ───────────────
-// Abre o detalhe de cada processo e verifica se tem advogado
-// constituído no polo passivo. Retorna true se NÃO tem advogado.
-async function semAdvogado(page, numeroProcesso) {
-  try {
-    // Procura o item na lista pelo número do processo e clica
-    const item = page.locator("ion-list ion-item").filter({
-      hasText: numeroProcesso
-    }).first();
-
-    if (!await item.isVisible({ timeout: 3000 }).catch(() => false)) {
-      return false;
-    }
-
-    await item.click({ force: true });
-    await page.waitForLoadState("networkidle").catch(() => {});
-    await page.waitForTimeout(800);
-
-    // FIX 2: Salva HTML de debug para os primeiros processos (desativar em produção)
-    if (process.env.DEBUG_HTML === "1") {
-      const htmlDir = path.join(process.cwd(), "output");
-      if (!fs.existsSync(htmlDir)) fs.mkdirSync(htmlDir, { recursive: true });
-      const htmlPath = path.join(htmlDir, `debug_${numeroProcesso.replace(/[^0-9]/g, "")}.html`);
-      fs.writeFileSync(htmlPath, await page.content(), "utf8");
-      console.log(`\n🔍 HTML salvo: ${htmlPath}`);
-    }
-
-    // Extrai todo o texto da página de detalhe
-    const textoCompleto = await page.evaluate(() => document.body.innerText || "");
-
-    // Verifica se há advogado no polo passivo
-    // Padrões encontrados no JTe: "Advogado:", "Adv.:", "OAB", "Dr.", "Dra."
-    const poloPassivoSection = extrairSecaoPoloPassivo(textoCompleto);
-    const temAdvogado = verificarAdvogadoNoTexto(poloPassivoSection || textoCompleto);
-
-    // Volta para a lista
-    await page.goBack().catch(() => {});
-    await page.waitForLoadState("networkidle").catch(() => {});
-    await page.waitForTimeout(500);
-
-    return !temAdvogado;
-  } catch (e) {
-    console.warn(`\n⚠️  Erro ao verificar ${numeroProcesso}: ${e.message}`);
-    return false; // conservador: se der erro, não inclui
-  }
-}
-
-function extrairSecaoPoloPassivo(texto) {
-  // Tenta isolar a seção de polo passivo do texto
-  const idxPassivo = texto.search(/polo\s+passivo/i);
-  if (idxPassivo === -1) return null;
-
-  // Pega o texto a partir do polo passivo até o próximo polo ou fim
-  const apos = texto.slice(idxPassivo);
-  const idxProximoPolo = apos.search(/polo\s+(ativo|autor|obreiro)/i);
-  return idxProximoPolo > 0 ? apos.slice(0, idxProximoPolo) : apos;
-}
-
-function verificarAdvogadoNoTexto(texto) {
-  if (!texto) return false;
-  return /advogado|adv\.|oab\s*[\d\/]|dr\.\s+[A-Z]|dra\.\s+[A-Z]/i.test(texto);
-}
-
-// ── FIX 3: Filtrar processos com data já passada ─────────────
-function dataJaPassou(dataBR) {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const dataAud = parseBR(dataBR);
-  return dataAud < hoje;
-}
-
 // ── Listar varas ─────────────────────────────────────────────
 async function listarVaras(browser){
   const page=await browser.newPage();
@@ -244,11 +165,6 @@ async function listarVaras(browser){
 
 // ── Processar 1 job ──────────────────────────────────────────
 async function processarJob(browser,vara,dataBR,pool,geradoEm){
-  // FIX 3: Pula datas já passadas (pode chegar na fila depois de vários dias)
-  if (dataJaPassou(dataBR)) {
-    return { n: 0, pulado: true };
-  }
-
   const page=await browser.newPage();page.setDefaultTimeout(45000);
   try{
     await page.goto("https://jte.csjt.jus.br/start",{waitUntil:"networkidle",timeout:60000});
@@ -276,28 +192,15 @@ async function processarJob(browser,vara,dataBR,pool,geradoEm){
     if(!await esperar(page))return{n:0};
     const ps=await extrair(page);
     if(!ps.length)return{n:0};
-
-    // ── FIX 1: Filtrar apenas polo passivo sem advogado ──────
-    // ATENÇÃO: verificar cada processo abre e fecha uma página de detalhe.
-    // Se o JTe não tiver página de detalhe acessível, desabilite esta seção
-    // e ative o modo DEBUG_HTML=1 para inspecionar o HTML primeiro.
-    const psFiltrados = [];
-    for (const p of ps) {
-      const ehLead = await semAdvogado(page, p.numeroProcesso);
-      if (ehLead) psFiltrados.push(p);
-    }
-
-    if (!psFiltrados.length) return { n: 0 };
-
-    const vals=psFiltrados.map(()=>"(?,?,?,?,?,?,?,?,?)").join(",");
-    const args=psFiltrados.flatMap(p=>[new Date(geradoEm),vara,dataBR,brToIso(dataBR),
+    const vals=ps.map(()=>"(?,?,?,?,?,?,?,?,?)").join(",");
+    const args=ps.flatMap(p=>[new Date(geradoEm),vara,dataBR,brToIso(dataBR),
       p.numeroProcesso,p.sessao||null,p.juiz||null,p.reclamante||null,p.reclamada||null]);
     await pool.query(
       `INSERT INTO processos_sem_polo_passivo(geradoEm,vara,dataBR,dataISO,numeroProcesso,sessao,juiz,reclamante,reclamada)
        VALUES ${vals} ON DUPLICATE KEY UPDATE geradoEm=VALUES(geradoEm),sessao=VALUES(sessao),
        juiz=VALUES(juiz),reclamante=VALUES(reclamante),reclamada=VALUES(reclamada)`,args
     ).catch(e=>console.warn(`⚠️  DB: ${e.message}`));
-    return{n:psFiltrados.length};
+    return{n:ps.length};
   }catch(e){throw e;}
   finally{await page.close().catch(()=>{});}
 }
@@ -305,7 +208,7 @@ async function processarJob(browser,vara,dataBR,pool,geradoEm){
 // ── MAIN ─────────────────────────────────────────────────────
 async function main(){
   const geradoEm=new Date().toISOString();
-  console.log(`\n🚀 Worker JTe | concorrência: ${CONCURRENCY} | meses: ${MESES}${VARAS_LIMIT?` | TESTE: ${VARAS_LIMIT} varas`:""}`);
+  console.log(`\n🚀 Worker JTe | concorrência: ${CONCURRENCY} | meses: ${MESES}`);
 
   const pool=await dbPool();
   console.log("✅ MySQL");
@@ -313,16 +216,8 @@ async function main(){
   if(!ONLY_WORK){
     console.log("\n📦 Listando varas...");
     const bTemp=await chromium.launch({headless:true});
-    let varas=await listarVaras(bTemp);
+    const varas=await listarVaras(bTemp);
     await bTemp.close();
-
-    // FIX: Limite de varas para teste
-    if (VARAS_LIMIT > 0) {
-      varas = varas.slice(0, VARAS_LIMIT);
-      console.log(`\n🧪 MODO TESTE: ${varas.length} varas selecionadas`);
-      console.log(`   ${varas.join(" | ")}`);
-    }
-
     const datas=gerarDatas();
     console.log(`   ${varas.length} varas × ${datas.length} dias = ${varas.length*datas.length} jobs`);
     console.log(`   ${datas[0]} → ${datas[datas.length-1]}\n`);
@@ -359,7 +254,7 @@ async function main(){
       done++;procs+=r.n||0;
       const pct=((done/total)*100).toFixed(1);
       const eta=done>0?Math.round((Date.now()-t0)/done*(total-done)/1000):"?";
-      process.stdout.write(`\r  [${pct}%] ${done}/${total} | ${procs} leads qualificados | ETA: ${eta}s   `);
+      process.stdout.write(`\r  [${pct}%] ${done}/${total} | ${procs} processos | ETA: ${eta}s   `);
     }catch(e){erros++;done++;throw e;}
   },{connection:REDIS,concurrency:CONCURRENCY});
 
@@ -372,7 +267,7 @@ async function main(){
     worker.on("error",e=>console.error("\n❌",e.message));
   });
 
-  console.log(`\n\n✅ ${((Date.now()-t0)/1000).toFixed(0)}s | ${procs} leads qualificados | ${erros} erros`);
+  console.log(`\n\n✅ ${((Date.now()-t0)/1000).toFixed(0)}s | ${procs} processos | ${erros} erros`);
   await worker.close();
   await Promise.all(browsers.map(b=>b.close().catch(()=>{})));
   await pool.end();
