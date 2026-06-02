@@ -1,121 +1,198 @@
 "use client";
 import { useRouter } from "next/navigation";
 
+const C = {
+  black:   "#111111",
+  orange:  "#E05A00",
+  white:   "#FFFFFF",
+  gray:    "#F4F4F4",
+  border:  "#E5E7EB",
+  text:    "#1A1A1A",
+  textSub: "#6B6B6B",
+};
+
 export default function UpgradePage() {
   const router = useRouter();
 
   return (
     <div style={{
-      minHeight: "100vh", background: "#f5f7fa",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+      minHeight: "100vh",
+      background: C.black,
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     }}>
-      <div style={{ maxWidth: 760, width: "100%" }}>
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111827", margin: "0 0 8px" }}>
+      {/* Header */}
+      <header style={{
+        background: C.black, borderBottom: `1px solid #1f1f1f`,
+        padding: "0 28px", height: 58,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em" }}>
+          <span style={{ color: C.white }}>Ativa.</span>
+          <span style={{ color: C.orange }}>LAW</span>
+        </div>
+        <button
+          onClick={() => router.push("/dashboard")}
+          style={{ background: "transparent", color: "#666", border: "1px solid #333", borderRadius: 6, padding: "5px 14px", fontSize: 12, cursor: "pointer" }}
+        >
+          ← Voltar
+        </button>
+      </header>
+
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "56px 24px" }}>
+
+        {/* Título */}
+        <div style={{ textAlign: "center", marginBottom: 52 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 800, color: C.white, margin: "0 0 12px", letterSpacing: "-0.02em" }}>
             Escolha seu plano
           </h1>
-          <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>
-            Monitore processos trabalhistas sem polo passivo antes da audiência
+          <p style={{ color: "#666", fontSize: 15, margin: 0, lineHeight: 1.6 }}>
+            Acesse processos trabalhistas com polo passivo sem advogado —<br />
+            entregues direto no seu painel antes da audiência.
           </p>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-          <Plano
-            nome="Free"
-            preco="R$0"
-            periodo="para sempre"
-            cor="#6b7280"
-            features={[
-              "Acesso a todos os processos",
-              "Filtros por vara, data e empresa",
-              "Busca por número do processo",
-              "Sem alertas por e-mail",
-              "Sem filtros salvos",
-            ]}
-            cta="Continuar grátis"
-            onCta={() => router.push("/dashboard")}
-          />
-          <Plano
-            nome="Premium"
-            preco="R$147"
-            periodo="/mês"
-            cor="#1a3a5c"
-            destaque
-            features={[
-              "Tudo do plano Free",
-              "Alertas por e-mail em tempo real",
-              "Filtros salvos personalizados",
-              "Notificação imediata de novos processos",
-              "Histórico completo",
-              "Suporte prioritário",
-            ]}
-            cta="Assinar Premium"
-            onCta={() => alert("Integração com pagamento em breve!")}
-          />
+        {/* Cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+
+          {/* Plano Sem Suporte */}
+          <div style={{
+            background: "#161616",
+            border: `1px solid #2a2a2a`,
+            borderRadius: 14,
+            padding: "36px 32px",
+            display: "flex", flexDirection: "column",
+          }}>
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Plataforma</div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: C.white, margin: "0 0 4px", lineHeight: 1.3 }}>
+                Processos Jurídicos<br />
+                <span style={{ color: "#555", fontWeight: 400 }}>sem Suporte</span>
+              </h2>
+              <div style={{ marginTop: 20 }}>
+                <span style={{ fontSize: 38, fontWeight: 800, color: C.white }}>R$ 1.995</span>
+                <span style={{ fontSize: 13, color: "#555", marginLeft: 6 }}>/mês</span>
+              </div>
+              <p style={{ fontSize: 13, color: "#666", margin: "12px 0 0", lineHeight: 1.6 }}>
+                Ferramenta que ajuda na geração de leads jurídicos conseguindo e-mails e dados de contato das empresas reclamadas.
+              </p>
+            </div>
+
+            <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px", display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
+              {[
+                "Acesso completo à plataforma",
+                "Leads com polo passivo sem advogado",
+                "Filtros por vara, data e empresa",
+                "Exportação CSV dos contatos",
+                "Alertas por e-mail em tempo real",
+                "Contatos enriquecidos via Snov.io",
+              ].map(f => (
+                <li key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, color: "#aaa" }}>
+                  <span style={{ color: C.orange, fontWeight: 700, marginTop: 1, flexShrink: 0 }}>✓</span>
+                  {f}
+                </li>
+              ))}
+              {[
+                "Sem suporte do time Ativa.ai",
+                "Sem onboarding assistido",
+              ].map(f => (
+                <li key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, color: "#444" }}>
+                  <span style={{ color: "#333", fontWeight: 700, marginTop: 1, flexShrink: 0 }}>✕</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={() => alert("Em breve — entre em contato: contato@ativa.law")}
+              style={{
+                width: "100%", padding: "13px",
+                background: "transparent",
+                color: C.white,
+                border: `1.5px solid #333`,
+                borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              Contratar plano
+            </button>
+          </div>
+
+          {/* Plano Com Suporte — destaque */}
+          <div style={{
+            background: "#1a1a1a",
+            border: `2px solid ${C.orange}`,
+            borderRadius: 14,
+            padding: "36px 32px",
+            display: "flex", flexDirection: "column",
+            position: "relative",
+            boxShadow: `0 0 40px rgba(224,90,0,0.15)`,
+          }}>
+            {/* Badge */}
+            <div style={{
+              position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)",
+              background: C.orange, color: C.white,
+              borderRadius: 20, padding: "4px 18px",
+              fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", whiteSpace: "nowrap",
+            }}>
+              RECOMENDADO
+            </div>
+
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.orange, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Plataforma + Suporte</div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: C.white, margin: "0 0 4px", lineHeight: 1.3 }}>
+                Processos Jurídicos<br />
+                <span style={{ color: C.orange }}>com Suporte Ativa.ai</span>
+              </h2>
+              <div style={{ marginTop: 20 }}>
+                <span style={{ fontSize: 38, fontWeight: 800, color: C.orange }}>R$ 2.995</span>
+                <span style={{ fontSize: 13, color: "#888", marginLeft: 6 }}>/mês</span>
+              </div>
+              <p style={{ fontSize: 13, color: "#888", margin: "12px 0 0", lineHeight: 1.6 }}>
+                Ferramenta que ajuda na geração de leads jurídicos conseguindo e-mails e dados de contato, com o time Ativa.ai operando junto.
+              </p>
+            </div>
+
+            <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px", display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
+              {[
+                "Tudo do plano sem suporte",
+                "Onboarding assistido pelo time Ativa.ai",
+                "Suporte dedicado via WhatsApp",
+                "Configuração e operação assistida",
+                "Estratégia de abordagem dos leads",
+                "Relatórios mensais de desempenho",
+                "Atualizações e melhorias incluídas",
+                "SLA de resposta em até 4h úteis",
+              ].map(f => (
+                <li key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, color: "#ccc" }}>
+                  <span style={{ color: C.orange, fontWeight: 700, marginTop: 1, flexShrink: 0 }}>✓</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={() => alert("Em breve — entre em contato: contato@ativa.law")}
+              style={{
+                width: "100%", padding: "13px",
+                background: C.orange,
+                color: C.white,
+                border: "none",
+                borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer",
+                letterSpacing: "0.01em",
+              }}
+            >
+              Contratar com suporte
+            </button>
+          </div>
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "#9ca3af" }}>
-          Dúvidas? Entre em contato: contato@jte-monitor.com.br
+        {/* Rodapé */}
+        <div style={{ textAlign: "center", marginTop: 40, fontSize: 13, color: "#444" }}>
+          Dúvidas? Fale com a gente:{" "}
+          <a href="mailto:contato@ativa.law" style={{ color: C.orange, textDecoration: "none", fontWeight: 500 }}>
+            contato@ativa.law
+          </a>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Plano({ nome, preco, periodo, cor, destaque, features, cta, onCta }) {
-  return (
-    <div style={{
-      background: "#fff",
-      border: `${destaque ? 2 : 1}px solid ${destaque ? cor : "#e5e7eb"}`,
-      borderRadius: 12,
-      padding: "28px 24px",
-      position: "relative",
-      boxShadow: destaque ? "0 8px 32px rgba(26,58,92,0.12)" : "none",
-    }}>
-      {destaque && (
-        <div style={{
-          position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)",
-          background: cor, color: "#fff", borderRadius: 20,
-          padding: "4px 16px", fontSize: 11, fontWeight: 700,
-        }}>
-          MAIS POPULAR
-        </div>
-      )}
-
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: "#111827" }}>{nome}</div>
-        <div style={{ marginTop: 8 }}>
-          <span style={{ fontSize: 32, fontWeight: 800, color: cor }}>{preco}</span>
-          <span style={{ fontSize: 14, color: "#6b7280", marginLeft: 4 }}>{periodo}</span>
-        </div>
-      </div>
-
-      <ul style={{
-        listStyle: "none", padding: 0, margin: "0 0 24px",
-        display: "flex", flexDirection: "column", gap: 10,
-      }}>
-        {features.map(f => (
-          <li key={f} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 14, color: "#374151" }}>
-            <span style={{ color: destaque ? cor : "#9ca3af", fontWeight: 700, marginTop: 1 }}>
-              {destaque ? "✓" : "–"}
-            </span>
-            {f}
-          </li>
-        ))}
-      </ul>
-
-      <button
-        onClick={onCta}
-        style={{
-          width: "100%", padding: 12,
-          background: destaque ? cor : "#fff",
-          color: destaque ? "#fff" : cor,
-          border: `1.5px solid ${cor}`,
-          borderRadius: 7, fontSize: 14, fontWeight: 600, cursor: "pointer",
-        }}
-      >
-        {cta}
-      </button>
     </div>
   );
 }
