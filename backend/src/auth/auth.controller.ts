@@ -18,12 +18,12 @@ function detectarDispositivo(ua: string): "mobile" | "desktop" | "unknown" {
 
 async function registrarSessao(db: DbService, userId: number, req: Request) {
   try {
-    const ua  = req.headers["user-agent"] || "";
-    const ip  = (req.headers["x-forwarded-for"] as string)?.split(",")[0] || req.ip || "";
+    const ua   = String(req.headers["user-agent"] || "").slice(0, 512);
+    const ip   = String((req.headers["x-forwarded-for"] as string)?.split(",")[0] || req.ip || "").slice(0, 64);
     const disp = detectarDispositivo(ua);
-    await db.pool.query(
+    await db.query(
       `INSERT INTO sessoes_acesso (userId, dispositivo, userAgent, ip, rota) VALUES (?,?,?,?,?)`,
-      [userId, disp, ua.slice(0, 512), ip.slice(0, 64), "/dashboard"]
+      [userId, disp, ua, ip, "/dashboard"]
     ).catch(() => {});
   } catch {}
 }
