@@ -13,6 +13,7 @@ import { ProcessosController }      from "./processos/processos.controller";
 import { AlertasController, AlertasService } from "./alertas/alertas.controller";
 import { ContatosController }       from "./contatos/contatos.controller";
 import { ContatosSnovController }   from "./contatos/contatos-snov.controller";
+import { AnalyticsController }      from "./admin/analytics.controller";
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ContatosSnovController }   from "./contatos/contatos-snov.controller";
     AlertasController,
     ContatosController,
     ContatosSnovController,
+    AnalyticsController,
   ],
   providers: [
     DbService, UsersService, AuthService, JwtStrategy, AlertasService,

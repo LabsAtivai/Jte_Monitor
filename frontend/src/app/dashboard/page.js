@@ -126,7 +126,7 @@ function StatCard({ label, valor, cor }) {
 
 // ── Página principal ─────────────────────────────────────────
 export default function DashboardPage() {
-  const { user, ready, logout, authFetch, isPremium } = useAuth();
+  const { user, ready, logout, authFetch, isPremium, isAdmin } = useAuth();
   const router = useRouter();
   const [aba, setAba] = useState("processos");
 
@@ -140,6 +140,7 @@ export default function DashboardPage() {
     { key: "processos", label: "Leads" },
     { key: "contatos",  label: "Contatos" },
     { key: "snov",      label: "Enriquecidos" },
+    ...(isAdmin ? [{ key: "analytics", label: "Analytics" }] : []),
   ];
 
   return (
@@ -177,6 +178,7 @@ export default function DashboardPage() {
       {aba === "processos" && <AbaProcessos authFetch={authFetch} user={user} isPremium={isPremium} router={router} />}
       {aba === "contatos"  && <AbaContatos  authFetch={authFetch} />}
       {aba === "snov"      && <AbaSnov      authFetch={authFetch} />}
+      {aba === "analytics" && isAdmin && <AbaAnalytics authFetch={authFetch} />}
     </div>
   );
 }
@@ -640,6 +642,204 @@ function PainelAlertas({ authFetch }) {
           <button onClick={() => remover(a.id)} style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer" }}>Remover</button>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Aba Analytics (admin only) ───────────────────────────────
+function AbaAnalytics({ authFetch }) {
+  const [stats,    setStats]    = useState(null);
+  const [acessos,  setAcessos]  = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [periodo,  setPeriodo]  = useState("7");
+
+  useEffect(() => { carregar(); }, [periodo]);
+
+  async function carregar() {
+    setLoading(true);
+    try {
+      const [rStats, rAcessos, rUsuarios] = await Promise.all([
+        authFetch(`${API}/api/admin/analytics/stats?dias=${periodo}`).then(r => r.json()).catch(() => null),
+        authFetch(`${API}/api/admin/analytics/acessos?dias=${periodo}`).then(r => r.json()).catch(() => []),
+        authFetch(`${API}/api/admin/analytics/usuarios`).then(r => r.json()).catch(() => []),
+      ]);
+      setStats(rStats);
+      setAcessos(Array.isArray(rAcessos) ? rAcessos : []);
+      setUsuarios(Array.isArray(rUsuarios) ? rUsuarios : []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Gera gráfico de barras SVG simples
+  function BarChart({ dados, cor, altura = 80 }) {
+    if (!dados?.length) return <div style={{ color: C.grayMid, fontSize: 12, padding: "20px 0" }}>Sem dados</div>;
+    const max = Math.max(...dados.map(d => d.valor || 0), 1);
+    const w = Math.floor(100 / dados.length);
+    return (
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: altura, padding: "0 4px" }}>
+        {dados.map((d, i) => (
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+            <div style={{ fontSize: 9, color: C.grayMid }}>{d.valor > 0 ? d.valor : ""}</div>
+            <div style={{
+              width: "100%", minHeight: 2,
+              height: `${Math.max(2, (d.valor / max) * (altura - 24))}px`,
+              background: cor || C.orange, borderRadius: "3px 3px 0 0",
+              transition: "height 0.3s",
+            }} title={`${d.label}: ${d.valor}`} />
+            <div style={{ fontSize: 9, color: C.grayMid, whiteSpace: "nowrap", overflow: "hidden", maxWidth: "100%", textAlign: "center" }}>
+              {d.labelCurto || d.label}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Gráfico de rosca SVG
+  function DonutChart({ mobile, desktop }) {
+    const total = (mobile || 0) + (desktop || 0);
+    if (!total) return <div style={{ color: C.grayMid, fontSize: 12 }}>Sem dados</div>;
+    const pct = Math.round((mobile / total) * 100);
+    const r = 40, cx = 56, cy = 56, stroke = 14;
+    const circ = 2 * Math.PI * r;
+    const mobilePct = (mobile / total) * circ;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <svg width={112} height={112} viewBox="0 0 112 112">
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.orange} strokeWidth={stroke}
+            strokeDasharray={`${mobilePct} ${circ}`} strokeLinecap="round"
+            transform={`rotate(-90 ${cx} ${cy})`} />
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.black} strokeWidth={stroke}
+            strokeDasharray={`${circ - mobilePct} ${circ}`}
+            strokeDashoffset={-(mobilePct)} strokeLinecap="round"
+            transform={`rotate(-90 ${cx} ${cy})`} />
+          <text x={cx} y={cy - 6} textAnchor="middle" fontSize={18} fontWeight={700} fill={C.text}>{total}</text>
+          <text x={cx} y={cy + 12} textAnchor="middle" fontSize={10} fill={C.grayMid}>sessões</text>
+        </svg>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: C.orange }} />
+              <span style={{ color: C.textSub }}>Mobile</span>
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.orange, marginLeft: 16 }}>{pct}%</div>
+          </div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: C.black }} />
+              <span style={{ color: C.textSub }}>Desktop</span>
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.black, marginLeft: 16 }}>{100 - pct}%</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const cardStyle = {
+    background: "#fff", border: `1px solid ${C.border}`,
+    borderRadius: 8, padding: "18px 20px",
+  };
+
+  return (
+    <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 20px" }}>
+
+      {/* Título + período */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: C.text }}>Analytics</h1>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: C.textSub }}>Acessos e uso da plataforma Ativa.LAW</p>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["7","7 dias"],["14","14 dias"],["30","30 dias"]].map(([v, l]) => (
+            <button key={v} onClick={() => setPeriodo(v)} style={{
+              background: periodo === v ? C.black : "#fff",
+              color: periodo === v ? "#fff" : C.text,
+              border: `1px solid ${periodo === v ? C.black : C.border}`,
+              borderRadius: 6, padding: "6px 14px", fontSize: 12,
+              fontWeight: periodo === v ? 700 : 400, cursor: "pointer",
+            }}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {loading && <EstadoVazio>Carregando analytics...</EstadoVazio>}
+
+      {!loading && (
+        <>
+          {/* Stats cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 24 }}>
+            <StatCard label="Visitas ao site"    valor={Number(stats?.totalSessoes     || 0).toLocaleString("pt-BR")} cor={C.orange} />
+            <StatCard label="Usuários únicos"    valor={Number(stats?.totalUsuarios    || 0).toLocaleString("pt-BR")} cor={C.black} />
+            <StatCard label="Sessões hoje"       valor={Number(stats?.sessoesHoje      || 0).toLocaleString("pt-BR")} cor="#065f46" />
+            <StatCard label="Novos cadastros"    valor={Number(stats?.novosCadastros   || 0).toLocaleString("pt-BR")} cor="#1e40af" />
+            <StatCard label="Usuários ativos"    valor={Number(stats?.usuariosAtivos   || 0).toLocaleString("pt-BR")} cor="#7c3aed" />
+          </div>
+
+          {/* Gráficos */}
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
+
+            {/* Acessos por dia */}
+            <div style={cardStyle}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 4 }}>Visitas ao site</div>
+              <div style={{ fontSize: 12, color: C.textSub, marginBottom: 16 }}>Últimos {periodo} dias</div>
+              <BarChart dados={acessos.map(a => ({
+                label: a.data,
+                labelCurto: a.data?.slice(0, 5),
+                valor: Number(a.sessoes || 0),
+              }))} cor={C.orange} altura={120} />
+            </div>
+
+            {/* Mobile vs Desktop */}
+            <div style={cardStyle}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 4 }}>Dispositivos</div>
+              <div style={{ fontSize: 12, color: C.textSub, marginBottom: 20 }}>Últimos {periodo} dias</div>
+              <DonutChart
+                mobile={Number(stats?.mobile || 0)}
+                desktop={Number(stats?.desktop || 0)}
+              />
+            </div>
+          </div>
+
+          {/* Usuários recentes */}
+          <div style={cardStyle}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 16 }}>Usuários cadastrados</div>
+            {usuarios.length === 0
+              ? <EstadoVazio>Nenhum usuário encontrado.</EstadoVazio>
+              : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr>{["Nome","Email","Plano","Cadastro","Último acesso","Status"].map(h => (
+                        <th key={h} style={{ padding: "8px 12px", textAlign: "left", background: C.black, fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `2px solid ${C.orange}`, whiteSpace: "nowrap" }}>{h}</th>
+                      ))}</tr>
+                    </thead>
+                    <tbody>
+                      {usuarios.map((u, i) => (
+                        <tr key={u.id} style={{ background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
+                          <td style={{ ...TD, fontWeight: 600 }}>{u.nome || "—"}</td>
+                          <td style={{ ...TD, fontFamily: "monospace", fontSize: 12 }}>{u.email}</td>
+                          <td style={TD}><TierBadge tier={u.tier} /></td>
+                          <td style={{ ...TD, fontSize: 12, color: C.textSub }}>{u.criadoEm ? new Date(u.criadoEm).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td style={{ ...TD, fontSize: 12, color: C.textSub }}>{u.ultimoAcesso ? new Date(u.ultimoAcesso).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td style={TD}>
+                            <span style={{ background: u.ativo ? "#d1fae5" : "#fee2e2", color: u.ativo ? "#065f46" : "#991b1b", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>
+                              {u.ativo ? "Ativo" : "Inativo"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            }
+          </div>
+        </>
+      )}
     </div>
   );
 }

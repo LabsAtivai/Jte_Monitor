@@ -3,6 +3,7 @@ import { Controller, Post, Get, Body, Req, Res, UseGuards, HttpCode } from "@nes
 import { Request, Response } from "express";
 import { AuthService }  from "./auth.service";
 import { JwtAuthGuard, CurrentUser } from "../common/guards/index";
+import { DbService } from "../common/db.service";
 
 const COOKIE = "jte_refresh";
 const COPTS  = (prod: boolean) => ({
@@ -10,21 +11,40 @@ const COPTS  = (prod: boolean) => ({
   maxAge: 7 * 86400000, path: "/api/auth",
 });
 
+function detectarDispositivo(ua: string): "mobile" | "desktop" | "unknown" {
+  if (!ua) return "unknown";
+  return /mobile|android|iphone|ipad|tablet/i.test(ua) ? "mobile" : "desktop";
+}
+
+async function registrarSessao(db: DbService, userId: number, req: Request) {
+  try {
+    const ua  = req.headers["user-agent"] || "";
+    const ip  = (req.headers["x-forwarded-for"] as string)?.split(",")[0] || req.ip || "";
+    const disp = detectarDispositivo(ua);
+    await db.pool.query(
+      `INSERT INTO sessoes_acesso (userId, dispositivo, userAgent, ip, rota) VALUES (?,?,?,?,?)`,
+      [userId, disp, ua.slice(0, 512), ip.slice(0, 64), "/dashboard"]
+    ).catch(() => {});
+  } catch {}
+}
+
 @Controller("api/auth")
 export class AuthController {
-  constructor(private auth: AuthService) {}
+  constructor(private auth: AuthService, private db: DbService) {}
 
   @Post("register")
-  async register(@Body() b: any, @Res({ passthrough: true }) res: Response) {
+  async register(@Body() b: any, @Res({ passthrough: true }) res: Response, @Req() req: Request) {
     const t = await this.auth.registrar(b.nome, b.email, b.senha);
     res.cookie(COOKIE, t.refreshToken, COPTS(process.env.NODE_ENV === "production"));
+    await registrarSessao(this.db, t.user.id, req);
     return { accessToken: t.accessToken, user: t.user };
   }
 
   @Post("login") @HttpCode(200)
-  async login(@Body() b: any, @Res({ passthrough: true }) res: Response) {
+  async login(@Body() b: any, @Res({ passthrough: true }) res: Response, @Req() req: Request) {
     const t = await this.auth.login(b.email, b.senha);
     res.cookie(COOKIE, t.refreshToken, COPTS(process.env.NODE_ENV === "production"));
+    await registrarSessao(this.db, t.user.id, req);
     return { accessToken: t.accessToken, user: t.user };
   }
 
