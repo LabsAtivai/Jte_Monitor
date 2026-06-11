@@ -137,9 +137,9 @@ export default function DashboardPage() {
   if (!ready || !user) return null;
 
   const abas = [
-    { key: "processos", label: "Leads" },
-    { key: "contatos",  label: "Contatos" },
-    { key: "snov",      label: "Enriquecidos" },
+    { key: "processos", label: "Processos" },
+    { key: "contatos",  label: "Informações" },
+    { key: "snov",      label: "Contatos" },
     ...(isAdmin ? [{ key: "analytics", label: "Analytics" }] : []),
   ];
 

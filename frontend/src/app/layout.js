@@ -1,7 +1,7 @@
 import { AuthProvider } from "@/lib/auth";
 
 export const metadata = {
-  title: "JTe Monitor",
+  title: "Ativa.LAW",
   description: "Processos sem polo passivo — TRT-2 SP",
 };
 
