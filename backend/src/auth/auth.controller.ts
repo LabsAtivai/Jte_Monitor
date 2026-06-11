@@ -1,5 +1,5 @@
 // backend/src/auth/auth.controller.ts
-import { Controller, Post, Get, Body, Req, Res, UseGuards, HttpCode } from "@nestjs/common";
+import { Controller, Post, Get, Body, Req, Res, UseGuards, HttpCode, UnauthorizedException } from "@nestjs/common";
 import { Request, Response } from "express";
 import { AuthService }  from "./auth.service";
 import { JwtAuthGuard, CurrentUser } from "../common/guards/index";
@@ -51,7 +51,7 @@ export class AuthController {
   @Post("refresh") @HttpCode(200)
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const rt = req.cookies?.[COOKIE];
-    if (!rt) return res.status(401).json({ message: "Sem refresh token" });
+    if (!rt) throw new UnauthorizedException("Sem refresh token");
     const t = await this.auth.refresh(rt);
     res.cookie(COOKIE, t.refreshToken, COPTS(process.env.NODE_ENV === "production"));
     return { accessToken: t.accessToken, user: t.user };
