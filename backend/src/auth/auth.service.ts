@@ -14,9 +14,9 @@ export class AuthService {
     private cfg: ConfigService,  private db:  DbService,
   ) {}
 
-  async registrar(nome: string, email: string, senha: string) {
+  async registrar(nome: string, email: string, senha: string, extra?: { telefone?: string; cpfCnpj?: string }) {
     if (senha.length < 8) throw new BadRequestException("Senha deve ter ao menos 8 caracteres");
-    const user = await this.users.criar(nome, email, senha);
+    const user = await this.users.criar(nome, email, senha, extra);
     return this._tokens(user);
   }
 

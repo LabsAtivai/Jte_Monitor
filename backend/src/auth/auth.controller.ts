@@ -34,7 +34,7 @@ export class AuthController {
 
   @Post("register")
   async register(@Body() b: any, @Res({ passthrough: true }) res: Response, @Req() req: Request) {
-    const t = await this.auth.registrar(b.nome, b.email, b.senha);
+    const t = await this.auth.registrar(b.nome, b.email, b.senha, { telefone: b.telefone, cpfCnpj: b.cpfCnpj });
     res.cookie(COOKIE, t.refreshToken, COPTS(process.env.NODE_ENV === "production"));
     await registrarSessao(this.db, t.user.id, req);
     return { accessToken: t.accessToken, user: t.user };

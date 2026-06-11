@@ -28,12 +28,13 @@ export class UsersService {
     return rows[0] ?? null;
   }
 
-  async criar(nome: string, email: string, senha: string): Promise<User> {
+  async criar(nome: string, email: string, senha: string, extra?: { telefone?: string; cpfCnpj?: string }): Promise<User> {
     const norm = email.toLowerCase().trim();
     if (await this.findByEmail(norm)) throw new ConflictException("E-mail já cadastrado");
     const hash = await bcrypt.hash(senha, 12);
     const [r]  = await this.db.query<any>(
-      "INSERT INTO users (nome,email,senhaHash) VALUES (?,?,?)", [nome.trim(), norm, hash]
+      "INSERT INTO users (nome,email,senhaHash,telefone,cpfCnpj) VALUES (?,?,?,?,?)",
+      [nome.trim(), norm, hash, extra?.telefone || null, extra?.cpfCnpj?.replace(/\D/g,"") || null]
     );
     return this.findById(r.insertId) as Promise<User>;
   }
