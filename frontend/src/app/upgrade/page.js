@@ -73,7 +73,7 @@ export default function UpgradePage() {
                 <span style={{ fontSize: 13, color: "#555", marginLeft: 6 }}>/mês</span>
               </div>
               <p style={{ fontSize: 13, color: "#666", margin: "12px 0 0", lineHeight: 1.6 }}>
-                Ferramenta que ajuda na geração de leads jurídicos conseguindo e-mails e dados de contato das empresas reclamadas.
+                Ferramenta que ajuda na geração de leads jurídicos com dados de contato das empresas reclamadas.
               </p>
             </div>
 
@@ -83,7 +83,6 @@ export default function UpgradePage() {
                 "Leads com polo passivo sem advogado",
                 "Filtros por vara, data e empresa",
                 "Exportação CSV dos contatos",
-                "Alertas por e-mail em tempo real",
                 "Contatos enriquecidos via Snov.io",
               ].map(f => (
                 <li key={f} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, color: "#aaa" }}>
@@ -147,7 +146,7 @@ export default function UpgradePage() {
                 <span style={{ fontSize: 13, color: "#888", marginLeft: 6 }}>/mês</span>
               </div>
               <p style={{ fontSize: 13, color: "#888", margin: "12px 0 0", lineHeight: 1.6 }}>
-                Ferramenta que ajuda na geração de leads jurídicos conseguindo e-mails e dados de contato, com o time Ativa.ai operando junto.
+                Ferramenta que ajuda na geração de leads jurídicos com dados de contato, com o time Ativa.ai operando junto.
               </p>
             </div>
 

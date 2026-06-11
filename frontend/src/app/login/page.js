@@ -123,7 +123,7 @@ export default function LoginPage() {
           <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 24 }}>
             {[
               { icon: "⚖️", titulo: "Filtro automático", desc: "Apenas processos com polo passivo sem advogado constituído." },
-              { icon: "🔔", titulo: "Alertas em tempo real", desc: "Notificação assim que um novo lead elegível é detectado." },
+              { icon: "⚡", titulo: "Atualização diária", desc: "Novos leads identificados todos os dias úteis automaticamente." },
               { icon: "📋", titulo: "Dados completos", desc: "CNPJ, razão social, data da audiência e vara trabalhista." },
               { icon: "🚀", titulo: "Você chega primeiro", desc: "Acesse o lead antes que qualquer concorrente saiba da audiência." },
             ].map(f => (
@@ -174,7 +174,7 @@ export default function LoginPage() {
         </h2>
         <p style={{ fontSize: 14, color: "#666", lineHeight: 1.7, maxWidth: 340, margin: 0 }}>
           {modo === "login"
-            ? "Entre na plataforma e acesse os leads do seu tribunal em tempo real."
+            ? "Entre na plataforma e acesse os leads do seu tribunal."
             : "Cadastre-se para ter acesso completo. Após o cadastro, escolha o plano e comece a receber leads."}
         </p>
 

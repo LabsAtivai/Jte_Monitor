@@ -199,7 +199,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
         </p>
         <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, padding: "20px 24px", marginBottom: 28, textAlign: "left" }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 12 }}>O que você terá acesso:</div>
-          {["Leads com audiência marcada e sem advogado", "Filtros por vara, data e empresa", "Exportação CSV dos contatos", "Dados da empresa via Receita Federal", "Alertas por e-mail em tempo real"].map(f => (
+          {["Leads com audiência marcada e sem advogado", "Filtros por vara, data e empresa", "Exportação CSV dos contatos", "Dados da empresa via Receita Federal", "Acesso completo ao painel de leads"].map(f => (
             <div key={f} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8, fontSize: 13, color: C.textSub }}>
               <span style={{ color: C.orange, fontWeight: 700, flexShrink: 0 }}>✓</span>{f}
             </div>
@@ -213,7 +213,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
           Ver planos e assinar →
         </button>
         <div style={{ marginTop: 14, fontSize: 12, color: C.grayMid }}>
-          A partir de R$ 1.995/mês · Cancele quando quiser
+          A partir de R$ 1.995/mês · Política de cancelamento de 30 dias
         </div>
       </div>
     );
@@ -323,7 +323,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
         )}
       </div>
 
-      {isPremium && <PainelAlertas authFetch={authFetch} />}
+      {isPremium && null}
     </div>
   );
 }
@@ -615,69 +615,7 @@ function AbaSnov({ authFetch }) {
   );
 }
 
-// ── Painel de Alertas ────────────────────────────────────────
-function PainelAlertas({ authFetch }) {
-  const [lista, setLista]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [criando, setCriando] = useState(false);
-  const [fNome, setFNome]     = useState("");
-  const [fVara, setFVara]     = useState("");
-  const [fRec, setFRec]       = useState("");
-
-  useEffect(() => { carregar(); }, []);
-
-  async function carregar() {
-    setLoading(true);
-    try { const r = await authFetch(`${API}/api/alertas`); const j = await r.json(); setLista(Array.isArray(j) ? j : []); }
-    finally { setLoading(false); }
-  }
-
-  async function criar() {
-    if (!fNome.trim()) return;
-    await authFetch(`${API}/api/alertas`, { method: "POST", body: JSON.stringify({ nome: fNome, vara: fVara || undefined, reclamada: fRec || undefined }) });
-    setFNome(""); setFVara(""); setFRec(""); setCriando(false); carregar();
-  }
-
-  async function remover(id) { await authFetch(`${API}/api/alertas/${id}`, { method: "DELETE" }); carregar(); }
-
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: C.text }}>🔔 Alertas por e-mail</div>
-          <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>Seja notificado quando novos leads corresponderem aos seus critérios</div>
-        </div>
-        <BtnPrimario onClick={() => setCriando(true)}>+ Novo alerta</BtnPrimario>
-      </div>
-
-      {criando && (
-        <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8, padding: "18px 20px", marginBottom: 14, borderLeft: `3px solid ${C.orange}` }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-            <FiltroInput label="Nome do alerta *" value={fNome} onChange={e => setFNome(e.target.value)} placeholder="Ex: Bancos SP" />
-            <FiltroInput label="Vara (opcional)"  value={fVara} onChange={e => setFVara(e.target.value)} placeholder="1ª Vara..." />
-            <FiltroInput label="Empresa contém"   value={fRec}  onChange={e => setFRec(e.target.value)}  placeholder="Nome da empresa..." />
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <BtnPrimario onClick={criar}>Salvar alerta</BtnPrimario>
-            <BtnSecundario onClick={() => setCriando(false)}>Cancelar</BtnSecundario>
-          </div>
-        </div>
-      )}
-
-      {loading && <div style={{ color: C.grayMid, fontSize: 13 }}>Carregando alertas...</div>}
-      {!loading && lista.length === 0 && !criando && <div style={{ color: C.grayMid, fontSize: 13, padding: "16px 0" }}>Nenhum alerta criado ainda.</div>}
-      {lista.map(a => (
-        <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 16px", marginBottom: 8, borderLeft: `3px solid ${C.orange}` }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>{a.nome}</div>
-            <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{[a.vara && `Vara: ${a.vara}`, a.reclamada && `Empresa: ${a.reclamada}`].filter(Boolean).join(" · ") || "Todos os processos"}</div>
-          </div>
-          <button onClick={() => remover(a.id)} style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer" }}>Remover</button>
-        </div>
-      ))}
-    </div>
-  );
-}
+// fim do arquivo
 
 // ── Aba Analytics (admin only) ───────────────────────────────
 function AbaAnalytics({ authFetch }) {
