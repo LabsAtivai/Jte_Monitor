@@ -137,9 +137,11 @@ export default function DashboardPage() {
   if (!ready || !user) return null;
 
   const abas = [
-    { key: "processos", label: "Processos" },
-    { key: "contatos",  label: "Informações" },
-    { key: "snov",      label: "Contatos" },
+    { key: "processos",  label: "Processos" },
+    { key: "contatos",   label: "Informações" },
+    { key: "snov",       label: "Contatos" },
+    { key: "contratos",  label: "Contratos" },
+    { key: "conversoes", label: "Conversões" },
     ...(isAdmin ? [{ key: "analytics", label: "Analytics" }] : []),
   ];
 
@@ -175,10 +177,12 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {aba === "processos" && <AbaProcessos authFetch={authFetch} user={user} isPremium={isPremium} router={router} />}
-      {aba === "contatos"  && <AbaContatos  authFetch={authFetch} />}
-      {aba === "snov"      && <AbaSnov      authFetch={authFetch} />}
-      {aba === "analytics" && isAdmin && <AbaAnalytics authFetch={authFetch} />}
+      {aba === "processos"  && <AbaProcessos  authFetch={authFetch} user={user} isPremium={isPremium} router={router} />}
+      {aba === "contatos"   && <AbaContatos   authFetch={authFetch} />}
+      {aba === "snov"       && <AbaSnov       authFetch={authFetch} />}
+      {aba === "contratos"  && <AbaContratos  authFetch={authFetch} isPremium={isPremium} router={router} />}
+      {aba === "conversoes" && <AbaConversoes authFetch={authFetch} isPremium={isPremium} router={router} />}
+      {aba === "analytics"  && isAdmin && <AbaAnalytics authFetch={authFetch} />}
     </div>
   );
 }
@@ -615,7 +619,159 @@ function AbaSnov({ authFetch }) {
   );
 }
 
-// fim do arquivo
+// ── Bloqueio premium genérico ──────────────────────────────────
+function BloqueioPremium({ titulo, texto, router }) {
+  return (
+    <div style={{ maxWidth: 600, margin: "80px auto", padding: "0 24px", textAlign: "center" }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+      <h2 style={{ fontSize: 24, fontWeight: 800, color: C.text, margin: "0 0 12px" }}>{titulo}</h2>
+      <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.7, margin: "0 0 28px" }}>{texto}</p>
+      <button onClick={() => router.push("/upgrade")} style={{
+        background: C.orange, color: "#fff", border: "none",
+        borderRadius: 8, padding: "14px 36px", fontSize: 15, fontWeight: 700, cursor: "pointer",
+      }}>
+        Ver planos e assinar →
+      </button>
+    </div>
+  );
+}
+
+// ── Aba Contratos (análise de risco via IA) ────────────────────
+function AbaContratos({ authFetch, isPremium, router }) {
+  const [arquivo, setArquivo] = useState(null);
+  const [analise, setAnalise] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [erro,    setErro]    = useState("");
+
+  async function analisar() {
+    if (!arquivo) return;
+    setLoading(true); setErro(""); setAnalise("");
+    try {
+      const form = new FormData();
+      form.append("contrato", arquivo);
+      const res = await authFetch(`${API}/api/contratos/analise`, { method: "POST", body: form });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Falha ao analisar contrato.");
+      setAnalise(json.analise);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!isPremium) {
+    return <BloqueioPremium router={router}
+      titulo="Análise de contrato bloqueada"
+      texto="Assine um plano da Ativa.LAW para analisar riscos contratuais com IA." />;
+  }
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 20px" }}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: C.text }}>Contratos</h1>
+        <p style={{ margin: "4px 0 0", fontSize: 13, color: C.textSub }}>Envie um contrato (PDF ou TXT) e receba uma análise de riscos com sugestão de redação</p>
+      </div>
+
+      <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8, padding: "18px 20px", marginBottom: 20 }}>
+        <input type="file" accept=".pdf,.txt,application/pdf,text/plain"
+          onChange={e => setArquivo(e.target.files?.[0] || null)}
+          style={{ fontSize: 13, marginBottom: 14 }} />
+        <div>
+          <BtnPrimario onClick={analisar} disabled={!arquivo || loading}>
+            {loading ? "Analisando..." : "Analisar risco"}
+          </BtnPrimario>
+        </div>
+      </div>
+
+      {erro && (
+        <div style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13 }}>
+          {erro}
+        </div>
+      )}
+
+      {analise && (
+        <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8, padding: "20px 24px" }}>
+          <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13.5, lineHeight: 1.7, color: C.text, margin: 0 }}>{analise}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Aba Conversões (OCR documento → texto) ──────────────────────
+function AbaConversoes({ authFetch, isPremium, router }) {
+  const [arquivo, setArquivo] = useState(null);
+  const [texto,   setTexto]   = useState("");
+  const [loading, setLoading] = useState(false);
+  const [erro,    setErro]    = useState("");
+
+  async function converter() {
+    if (!arquivo) return;
+    setLoading(true); setErro(""); setTexto("");
+    try {
+      const form = new FormData();
+      form.append("documento", arquivo);
+      const res = await authFetch(`${API}/api/conversoes/ocr`, { method: "POST", body: form });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Falha ao converter documento.");
+      setTexto(json.texto);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function baixarTxt() {
+    const blob = new Blob([texto], { type: "text/plain;charset=utf-8" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = `conversao_${Date.now()}.txt`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (!isPremium) {
+    return <BloqueioPremium router={router}
+      titulo="Conversão de documento bloqueada"
+      texto="Assine um plano da Ativa.LAW para converter documentos escaneados em texto." />;
+  }
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 20px" }}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: C.text }}>Conversões</h1>
+        <p style={{ margin: "4px 0 0", fontSize: 13, color: C.textSub }}>Envie um documento escaneado (imagem ou PDF) e extraia o texto via OCR</p>
+      </div>
+
+      <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8, padding: "18px 20px", marginBottom: 20 }}>
+        <input type="file" accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.pptx,application/pdf,image/*"
+          onChange={e => setArquivo(e.target.files?.[0] || null)}
+          style={{ fontSize: 13, marginBottom: 14 }} />
+        <div>
+          <BtnPrimario onClick={converter} disabled={!arquivo || loading}>
+            {loading ? "Convertendo..." : "Converter para texto"}
+          </BtnPrimario>
+        </div>
+      </div>
+
+      {erro && (
+        <div style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13 }}>
+          {erro}
+        </div>
+      )}
+
+      {texto && (
+        <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8, padding: "20px 24px" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+            <BtnSecundario onClick={baixarTxt}>↓ Baixar .txt</BtnSecundario>
+          </div>
+          <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13.5, lineHeight: 1.7, color: C.text, margin: 0 }}>{texto}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Aba Analytics (admin only) ───────────────────────────────
 function AbaAnalytics({ authFetch }) {

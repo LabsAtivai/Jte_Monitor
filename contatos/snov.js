@@ -186,7 +186,39 @@ async function main() {
   `);
   console.log("✅ Tabela contatos_snov pronta");
 
-  // Pega domínios distintos das empresas com email
+  // Migração idempotente: dedupe por identidade real do contato (email, ou
+  // nome+cargo+linkedin quando não há email), pois email NULL não bloqueia
+  // duplicidade em UNIQUE KEY do MySQL.
+  const [[{ cnt: temColuna }]] = await pool.query(`
+    SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'contatos_snov' AND COLUMN_NAME = 'chaveDedupe'
+  `);
+  if (!temColuna) {
+    console.log("🔧 Migrando dedupe de contatos_snov...");
+    await pool.query(`
+      ALTER TABLE contatos_snov
+        ADD COLUMN chaveDedupe CHAR(64)
+          GENERATED ALWAYS AS (
+            SHA2(LOWER(TRIM(COALESCE(NULLIF(email,''), CONCAT_WS('|', nomeCompleto, cargo, linkedinUrl)))), 256)
+          ) STORED
+    `);
+    await pool.query(`
+      DELETE t1 FROM contatos_snov t1
+      JOIN contatos_snov t2
+        ON t1.dominio = t2.dominio
+       AND t1.chaveDedupe = t2.chaveDedupe
+       AND t1.id > t2.id
+    `);
+    await pool.query(`
+      ALTER TABLE contatos_snov
+        DROP INDEX uq_snov,
+        ADD UNIQUE KEY uq_snov (dominio, chaveDedupe)
+    `);
+    console.log("✅ Dedupe migrado, duplicados removidos");
+  }
+
+  // Pega domínios distintos das empresas com email (todos, sem limite —
+  // domínio já processado é pulado abaixo via contagem em contatos_snov)
   const [empresas] = await pool.query(`
     SELECT
       DISTINCT SUBSTRING_INDEX(email, '@', -1) AS dominio,
@@ -205,7 +237,6 @@ async function main() {
       AND email NOT LIKE '%terra.com%'
       AND email NOT LIKE '%bol.com%'
     ORDER BY reclamada
-    LIMIT 500
   `);
 
   console.log(`\n📋 ${empresas.length} domínios para enriquecer\n`);
@@ -234,56 +265,53 @@ async function main() {
 
     const { info, prospects, domainEmails, genericEmails } = resultado;
 
+    const upsert = async (tipo, campos) => {
+      await pool.query(
+        `INSERT INTO contatos_snov
+           (dominio, reclamada, numeroProcesso, vara, tipo,
+            firstName, lastName, nomeCompleto, cargo, email, linkedinUrl,
+            companyName, companyCity, companyIndustry, companySize)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE
+           tipo         = CASE WHEN FIELD(VALUES(tipo),'prospect','domain_email','generic')
+                                     < FIELD(tipo,'prospect','domain_email','generic')
+                                THEN VALUES(tipo) ELSE tipo END,
+           firstName    = COALESCE(firstName, VALUES(firstName)),
+           lastName     = COALESCE(lastName,  VALUES(lastName)),
+           nomeCompleto = COALESCE(nomeCompleto, VALUES(nomeCompleto)),
+           cargo        = COALESCE(cargo, VALUES(cargo)),
+           linkedinUrl  = COALESCE(linkedinUrl, VALUES(linkedinUrl)),
+           companyName  = COALESCE(companyName, VALUES(companyName)),
+           companyCity  = COALESCE(companyCity, VALUES(companyCity)),
+           companyIndustry = COALESCE(companyIndustry, VALUES(companyIndustry)),
+           companySize  = COALESCE(companySize, VALUES(companySize))`,
+        [dominio, reclamada, numeroProcesso, vara, tipo,
+         campos.firstName||null, campos.lastName||null, campos.nomeCompleto||null,
+         campos.cargo||null, campos.email||null, campos.linkedinUrl||null,
+         info?.company_name||null, info?.city||null, info?.industry||null, info?.size||null]
+      );
+      inseridos++;
+    };
+
     // Salva prospects
     for (const p of prospects) {
       try {
-        await pool.query(
-          `INSERT IGNORE INTO contatos_snov
-             (dominio, reclamada, numeroProcesso, vara, tipo,
-              firstName, lastName, nomeCompleto, cargo, linkedinUrl,
-              companyName, companyCity, companyIndustry, companySize)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [dominio, reclamada, numeroProcesso, vara, "prospect",
-           p.first_name||null, p.last_name||null,
-           [p.first_name, p.last_name].filter(Boolean).join(" ")||null,
-           p.position||null, p.source_page||null,
-           info?.company_name||null, info?.city||null,
-           info?.industry||null, info?.size||null]
-        );
-        inseridos++;
+        await upsert("prospect", {
+          firstName: p.first_name, lastName: p.last_name,
+          nomeCompleto: [p.first_name, p.last_name].filter(Boolean).join(" ") || null,
+          cargo: p.position, linkedinUrl: p.source_page,
+        });
       } catch {}
     }
 
     // Salva domain emails
     for (const e of domainEmails) {
-      try {
-        await pool.query(
-          `INSERT IGNORE INTO contatos_snov
-             (dominio, reclamada, numeroProcesso, vara, tipo, email,
-              companyName, companyCity, companyIndustry, companySize)
-           VALUES (?,?,?,?,?,?,?,?,?,?)`,
-          [dominio, reclamada, numeroProcesso, vara, "domain_email",
-           e.email||null, info?.company_name||null, info?.city||null,
-           info?.industry||null, info?.size||null]
-        );
-        inseridos++;
-      } catch {}
+      try { await upsert("domain_email", { email: e.email }); } catch {}
     }
 
     // Salva genéricos
     for (const e of genericEmails) {
-      try {
-        await pool.query(
-          `INSERT IGNORE INTO contatos_snov
-             (dominio, reclamada, numeroProcesso, vara, tipo, email,
-              companyName, companyCity, companyIndustry, companySize)
-           VALUES (?,?,?,?,?,?,?,?,?,?)`,
-          [dominio, reclamada, numeroProcesso, vara, "generic",
-           e.email||null, info?.company_name||null, info?.city||null,
-           info?.industry||null, info?.size||null]
-        );
-        inseridos++;
-      } catch {}
+      try { await upsert("generic", { email: e.email }); } catch {}
     }
 
     processados++;

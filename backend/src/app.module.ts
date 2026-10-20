@@ -13,6 +13,11 @@ import { ProcessosController }      from "./processos/processos.controller";
 import { AlertasController, AlertasService } from "./alertas/alertas.controller";
 import { ContatosController }       from "./contatos/contatos.controller";
 import { ContatosSnovController }   from "./contatos/contatos-snov.controller";
+import { SnovLiveService }          from "./contatos/snov-live.service";
+import { ContratosAnaliseController } from "./contratos/contratos-analise.controller";
+import { GeminiService }            from "./contratos/gemini.service";
+import { ConversoesController }     from "./conversoes/conversoes.controller";
+import { NanonetsService }          from "./conversoes/nanonets.service";
 import { AnalyticsController }      from "./admin/analytics.controller";
 
 @Module({
@@ -35,10 +40,13 @@ import { AnalyticsController }      from "./admin/analytics.controller";
     AlertasController,
     ContatosController,
     ContatosSnovController,
+    ContratosAnaliseController,
+    ConversoesController,
     AnalyticsController,
   ],
   providers: [
-    DbService, UsersService, AuthService, JwtStrategy, AlertasService,
+    DbService, UsersService, AuthService, JwtStrategy, AlertasService, SnovLiveService,
+    GeminiService, NanonetsService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

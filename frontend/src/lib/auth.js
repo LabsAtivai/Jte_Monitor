@@ -34,12 +34,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   const authFetch = useCallback(async (url, opts = {}) => {
+    // FormData (upload de arquivo) define seu próprio Content-Type com
+    // boundary — forçar application/json quebraria o multipart.
+    const isFormData = typeof FormData !== "undefined" && opts.body instanceof FormData;
     const go = (tk) =>
       fetch(url, {
         ...opts,
         credentials: "include",
         headers: {
-          "Content-Type": "application/json",
+          ...(isFormData ? {} : { "Content-Type": "application/json" }),
           ...opts.headers,
           ...(tk ? { Authorization: `Bearer ${tk}` } : {}),
         },

@@ -2,14 +2,16 @@
 import { Controller, Get, Query, UseGuards, ParseIntPipe, DefaultValuePipe } from "@nestjs/common";
 import { JwtAuthGuard, CurrentUser } from "../common/guards/index";
 import { DbService } from "../common/db.service";
+import { SnovLiveService } from "./snov-live.service";
 import { User } from "../users/users.service";
 
 const POR_PAGINA = 50;
+const DOMINIO_REGEX = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 
 @Controller("api/contatos-snov")
 @UseGuards(JwtAuthGuard)
 export class ContatosSnovController {
-  constructor(private db: DbService) {}
+  constructor(private db: DbService, private snovLive: SnovLiveService) {}
 
   @Get()
   async listar(
@@ -22,6 +24,20 @@ export class ContatosSnovController {
     @Query("pagina", new DefaultValuePipe(1), ParseIntPipe) pagina = 1,
   ) {
     const offset = (pagina - 1) * POR_PAGINA;
+
+    // Domínio exato e ainda sem contatos em cache: busca ao vivo na Snov.io
+    // antes de listar, para o resultado já aparecer nesta mesma consulta.
+    const dominioExato = dominio.trim().toLowerCase();
+    if (DOMINIO_REGEX.test(dominioExato)) {
+      const [[{ cnt }]] = await this.db.query<any>(
+        "SELECT COUNT(*) AS cnt FROM contatos_snov WHERE dominio = ?", [dominioExato],
+      );
+      if (cnt === 0) {
+        await this.snovLive
+          .enriquecerEsalvar(dominioExato, reclamada || null, null, vara || null)
+          .catch(() => {});
+      }
+    }
 
     const cond: string[] = [];
     const p: any[]       = [];

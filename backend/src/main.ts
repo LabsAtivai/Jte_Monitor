@@ -8,7 +8,7 @@ async function bootstrap() {
   app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors({
-    origin: ["https://ativa.law", "https://www.ativa.law", "http://207.244.249.157", "http://localhost:3000"],
+    origin: ["https://ativa.law", "https://www.ativa.law", "http://207.244.249.157", "http://localhost:3000", "http://localhost:3001"],
     credentials: true,
   });
   const port = process.env.PORT || 4000;
