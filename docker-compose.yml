@@ -28,6 +28,11 @@ services:
       FRONTEND_URL: https://ativa.law
       REDIS_HOST: 172.17.0.1
       REDIS_PORT: 6379
+      SNOV_CLIENT_ID: ${SNOV_CLIENT_ID}
+      SNOV_CLIENT_SECRET: ${SNOV_CLIENT_SECRET}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      NANONETS_API_TOKEN: ${NANONETS_API_TOKEN}
     ports:
       - "4000:4000"
     networks:
