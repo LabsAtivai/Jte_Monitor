@@ -20,16 +20,16 @@ async function main() {
     .filter(f => f.endsWith(".sql") && f !== "000_init.sql")
     .sort();
 
-  console.log(`\n🗄️  Rodando ${files.length} migration(s)...\n`);
+  console.log(`\nRodando ${files.length} migration(s)...\n`);
 
   for (const file of files) {
     const sql = fs.readFileSync(path.join(dir, file), "utf8");
     await conn.query(sql);
-    console.log(`  ✅ ${file}`);
+    console.log(`${file}`);
   }
 
   await conn.end();
-  console.log("\n✅ Migrations concluídas!\n");
+  console.log("\nMigrations concluídas!\n");
 }
 
 main().catch(err => { console.error("❌", err.message); process.exit(1); });
