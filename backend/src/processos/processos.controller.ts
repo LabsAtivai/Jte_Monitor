@@ -19,6 +19,7 @@ export class ProcessosController {
   async listar(
     @CurrentUser() user: User,
     @Query("vara")       vara       = "",
+    @Query("tribunal")   tribunal   = "TRT2 - São Paulo",
     @Query("dataInicio") dataInicio = "",
     @Query("dataFim")    dataFim    = "",
     @Query("numero")     numero     = "",
@@ -32,6 +33,7 @@ export class ProcessosController {
     const cond: string[] = [];
     const p:    any[]    = [];
 
+    if (tribunal)  { cond.push("tribunal = ?");          p.push(tribunal); }
     if (vara)       { cond.push("vara = ?");              p.push(vara); }
     if (dataInicio) { cond.push("dataISO >= ?");          p.push(dataInicio); }
     if (dataFim)    { cond.push("dataISO <= ?");          p.push(dataFim); }
@@ -45,14 +47,17 @@ export class ProcessosController {
     );
 
     const [rows] = await this.db.query<any[]>(
-      `SELECT id,vara,dataBR,dataISO,numeroProcesso,sessao,juiz,reclamante,reclamada,createdAt
+      `SELECT id,tribunal,regiao,vara,dataBR,dataISO,numeroProcesso,sessao,juiz,reclamante,reclamada,createdAt
        FROM processos_sem_polo_passivo ${where}
        ORDER BY dataISO ASC, vara ASC LIMIT ? OFFSET ?`,
       [...p, limite, offset]
     );
 
     const [varas] = await this.db.query<any[]>(
-      "SELECT DISTINCT vara FROM processos_sem_polo_passivo ORDER BY vara"
+      "SELECT DISTINCT vara FROM processos_sem_polo_passivo WHERE tribunal=? ORDER BY vara", [tribunal]
+    );
+    const [tribunais] = await this.db.query<any[]>(
+      "SELECT DISTINCT tribunal FROM processos_sem_polo_passivo ORDER BY tribunal"
     );
 
     // Recursos exclusivos premium
@@ -70,6 +75,7 @@ export class ProcessosController {
       pagina,
       totalPaginas: Math.ceil(totalReal / limite),
       varas:        varas.map((v: any) => v.vara),
+      tribunais:    tribunais.map((t: any) => t.tribunal),
       tier:         user.tier,
       isPremium,
       ...extras,
@@ -77,7 +83,7 @@ export class ProcessosController {
   }
 
   @Get("stats")
-  async stats() {
+  async stats(@Query("tribunal") tribunal = "TRT2 - São Paulo") {
     const [[row]] = await this.db.query<any>(`
       SELECT
         COUNT(*)              AS total,
@@ -85,7 +91,7 @@ export class ProcessosController {
         MIN(dataISO)          AS dataMin,
         MAX(dataISO)          AS dataMax,
         (SELECT iniciadoEm FROM execucoes ORDER BY id DESC LIMIT 1) AS ultimaExecucao
-      FROM processos_sem_polo_passivo`
+      FROM processos_sem_polo_passivo WHERE tribunal=?`, [tribunal]
     );
     return row;
   }

@@ -1,6 +1,6 @@
 # JTe Monitor
 
-Plataforma SaaS para monitorar processos trabalhistas sem polo passivo — TRT-2 São Paulo (Zonas Central, Norte e Oeste).
+Plataforma SaaS para monitorar processos trabalhistas classificados pelo worker como sem advogado no polo passivo. A coleta padrão é TRT-2 São Paulo (Zonas Central, Norte e Oeste); TRT e região podem ser configurados por execução.
 
 ---
 
@@ -101,7 +101,9 @@ jte-monitor/
 │   ├── 000_init.sql          ← cria banco + usuários MySQL (root)
 │   ├── 001_users.sql         ← users + refresh_tokens
 │   ├── 002_processos.sql     ← processos_sem_polo_passivo + execucoes
-│   └── 003_alertas.sql       ← alertas + notificacoes
+│   ├── 003_alertas.sql       ← alertas + notificacoes
+│   ├── 004_contatos.sql      ← contatos
+│   └── 005_tribunais.sql     ← tribunal/região nos processos
 ├── backend/
 │   ├── src/
 │   │   ├── main.ts                      ← bootstrap NestJS porta 4000
@@ -171,10 +173,12 @@ node migrate.js
 
 Saída esperada:
 ```
-🗄️  Rodando 3 migration(s)...
+🗄️  Rodando 5 migration(s)...
   ✅ 001_users.sql
   ✅ 002_processos.sql
   ✅ 003_alertas.sql
+  ✅ 004_contatos.sql
+  ✅ 005_tribunais.sql
 ✅ Migrations concluídas!
 ```
 
@@ -287,31 +291,38 @@ npx playwright install chromium --with-deps
 
 Instala o Chromium e dependências de sistema (~300 MB). Pode demorar alguns minutos.
 
-### Passo 2 — Teste com poucas varas
+### Passo 2 — Piloto com poucas varas e datas
 
-Antes da carga completa, teste com 2 varas e 1 mês para confirmar que está funcionando:
+Antes de executar o worker com o novo código, aplique a migration `005_tribunais.sql` em um banco de teste. Os comandos abaixo acessam MySQL e Redis e gravam dados; use somente no ambiente de teste autorizado.
+
+Os nomes de tribunal e região precisam corresponder exatamente às opções exibidas no JTe. `TRT` e `REGIAO` afetam tanto a descoberta das varas quanto cada job. `DATA_INICIO` e `DATA_FIM` (formato `DD/MM/AAAA`) limitam um piloto; sem elas, continua valendo o intervalo atual dos próximos `MESES`. `VARAS` limita as primeiras varas descobertas. O worker não inicia a fila se tribunal/região não forem encontrados.
+
+TRT-2 (padrão atual):
 
 ```bash
 cd backend
-CONCURRENCY=2 MESES=1 node worker/index.js
+TRT="TRT2 - São Paulo" REGIAO="São Paulo - Zonas Central, Norte e Oeste" VARAS=1 DATA_INICIO=21/10/2026 DATA_FIM=21/10/2026 CONCURRENCY=1 node worker/index.js
 ```
 
-Saída esperada:
-```
-🚀 Worker JTe | concorrência: 2 | meses: 1
-✅ MySQL
-📦 Listando varas...
-   52 varas × 22 dias = 1144 jobs  (só 2 varas serão processadas com CONCURRENCY=2)
-   17/05/2026 → 17/06/2026
+TRT-1 Rio de Janeiro (rótulos conferidos na interface do JTe em 20/10/2026):
 
-   1144/1144
-✅ 45s | 312 processos | 0 erros
-```
-
-Se aparecerem processos no banco, tudo certo:
 ```bash
-mysql -u jte -p jte -e "SELECT COUNT(*) FROM processos_sem_polo_passivo;"
+cd backend
+TRT="TRT1 - Rio de Janeiro" REGIAO="Rio de Janeiro" VARAS=1 DATA_INICIO=21/10/2026 DATA_FIM=21/10/2026 CONCURRENCY=1 node worker/index.js
 ```
+
+Procedimento de validação: substitua as datas de exemplo por um dia útil futuro com pauta visível; comece com `VARAS=1` e um dia, confira no log o TRT/região/vara selecionados, compare os processos retornados com a pauta visível daquela vara e data no JTe, e só então aumente para duas varas e duas datas. Revise também ausências e processos extras. A fila do TRT-1/Rio usa nome separado da fila padrão do TRT-2. Passe as mesmas variáveis `TRT` e `REGIAO` ao usar `--only-queue` e `--only-work`. Não rode carga completa nem agendamento até concluir essa conferência.
+
+Em 20/10/2026, a pauta pública da 1ª Vara do Trabalho do Rio de Janeiro para 21/10/2026 mostrava 10 audiências. Esta inspeção confirmou os rótulos e a estrutura da lista, mas ainda não comparou registros gerados pelo worker.
+
+Confira registros segregados por tribunal:
+```bash
+mysql -u jte -p jte -e "SELECT tribunal,regiao,COUNT(*) FROM processos_sem_polo_passivo GROUP BY tribunal,regiao;"
+```
+
+### Classificação de “sem advogado no polo passivo”
+
+A regra abre o detalhe do processo, tenta extrair a seção “polo passivo” e considera presença de advogado quando encontra `advogado`, `adv.`, `OAB`, `Dr.` ou `Dra.`; sem seção identificada, examina o texto completo da página. Em caso de erro, exclui o processo de forma conservadora. Durante o piloto do TRT-1 foi observado que o JTe pode mostrar apenas “Para realizar essa ação é necessário estar autenticado”. Esse aviso agora é tratado explicitamente como classificação inconclusiva: o modal é fechado, a pauta permanece aberta e o processo não é incluído. A expressão usada para identificar advogado não foi alterada. Ainda há risco de excluir um processo por menção incidental no texto geral ou por variação de layout; compare os detalhes manualmente antes de confiar no resultado comercial.
 
 ### Passo 3 — Carga inicial completa (6 meses)
 
@@ -343,6 +354,38 @@ node worker/index.js --only-work
 # Ajustar via env
 CONCURRENCY=6 MESES=3 node worker/index.js
 ```
+
+### Coleta nacional no worker existente (arquivos, sem MySQL e sem Redis)
+
+O mesmo `backend/worker/index.js` agora tem modos nacionais. Ele descobre os TRTs do seletor inicial do JTe e, para cada um, as regiões e varas de audiência de 1º grau. Cada vara/data é processada pela **mesma função `processarJob`** usada no modo TRT-2: a navegação, a extração da pauta e a regra de “sem advogado no polo passivo” são compartilhadas. No modo nacional, `processarJob` retorna os processos filtrados e o worker os salva em `backend/worker/output/national/AAAA-MM-DD/records/*.json`, com tribunal, região, vara e data. Cada registro informa também `processosNaPauta` e `classificacoesInconclusivas`; o `summary.json` soma esses campos para distinguir uma pauta vazia de detalhes bloqueados por autenticação. `discovery.json` lista as opções encontradas e `summary.json` informa quantidades e falhas. Esse modo entra antes de criar o pool MySQL ou a fila Redis. O modo padrão sem flags continua no TRT-2 e mantém a gravação atual no banco.
+
+**Limite da classificação atual:** na pauta pública do TRT-1, em 21/10/2026, 1ª Vara do Trabalho do Rio de Janeiro, foram vistos 10 processos. Ao clicar no primeiro (`0101120-87.2026.5.01.0013`), o JTe exibiu “Para realizar essa ação é necessário estar autenticado”, sem mostrar o detalhe ou o polo passivo. A partir dessa evidência, esse aviso passou a gerar resultado inconclusivo e o processo é excluído, evitando o falso positivo observado no piloto anterior. A expressão que procura indicadores de advogado continua igual e ainda precisa de conferência manual por tribunal. O primeiro campo descritivo da lista é a sala da audiência, embora o worker atual o grave como `juiz`.
+
+Por padrão, cada execução nacional coleta o próximo dia útil. `NATIONAL_BUSINESS_DAYS` aumenta esse horizonte; finais de semana são pulados. O modo diário roda às 06:00 no fuso `America/Sao_Paulo`, se o processo permanecer ativo. Em caso de falha, ele tenta novamente após 30 minutos; arquivos de tarefas concluídas são retomados sem nova coleta. O acesso ao seletor inicial admite duas novas tentativas com espera entre elas.
+
+```bash
+cd backend
+npx playwright install chromium  # uma vez no ambiente que executará a rotina
+
+# Piloto: TRT-1, Rio de Janeiro, primeira vara, data explícita
+NATIONAL_TRT="TRT1 - Rio de Janeiro" NATIONAL_REGION="Rio de Janeiro" NATIONAL_MAX_UNITS=1 \
+NATIONAL_DATE=22/10/2026 npm run national:once
+
+# Descobrir as opções de todos os TRTs sem processar pautas
+npm run national:discover
+
+# Execução nacional pontual, com 2 navegadores paralelos
+npm run national:once
+
+# Processo com agendamento diário interno
+npm run national:daily
+```
+
+`NATIONAL_DATE`, `NATIONAL_TRT` e `NATIONAL_REGION` servem para pilotos; remova essas variáveis no serviço diário. As opções `NATIONAL_MAX_TRIBUNALS`, `NATIONAL_MAX_REGIONS` e `NATIONAL_MAX_UNITS` limitam os primeiros itens descobertos; deixe todas em `0` (padrão) para cobrir todas as opções encontradas. `NATIONAL_OUTPUT_DIR` altera a pasta de saída, `NATIONAL_CONCURRENCY` (padrão `2`) controla tarefas simultâneas, `NATIONAL_START_RETRIES` (padrão `2`) define novas tentativas na abertura inicial, `NATIONAL_RETRY_MINUTES` (padrão `30`) define a espera após falha diária, e `NATIONAL_DAILY_TIME` (padrão `06:00`) define a hora. `NATIONAL_CHROME_PATH` permite usar um Chrome já instalado em vez do Chromium do Playwright; `NATIONAL_HEADLESS=0` abre uma janela para diagnóstico local.
+
+Para manter o processo diário ativo em um servidor Linux, ajuste usuário/caminhos no arquivo `backend/worker/jte-national.service.example`, copie-o para o systemd e habilite o serviço após conferir o piloto. O arquivo está apenas como exemplo; esta implementação não instala nem inicia um agendamento no computador atual.
+
+**Estado da validação local (21/10/2026):** um piloto executado no terminal do VS Code com TRT-1, região Rio de Janeiro, 1ª Vara do Trabalho do Rio de Janeiro e pauta de 22/10/2026 concluiu com sucesso, sem MySQL ou Redis. O worker encontrou os 24 TRTs, selecionou uma região e uma vara e extraiu 10 processos da pauta. O JTe exigiu autenticação para abrir o detalhe dos 10; todos foram tratados como classificação inconclusiva e nenhum foi salvo como processo sem advogado. Isso corrige o falso positivo do piloto anterior, no qual `0101018-26.2026.5.01.0026` havia sido incluído apenas porque o texto do aviso não continha um indicador de advogado. Uma repetição imediata destinada a conferir os novos contadores no arquivo foi bloqueada pelo JTe com HTTP 403 nas três tentativas. O piloto confirma descoberta, seleção, navegação, extração, tratamento conservador do aviso e gravação em arquivo no TRT-1. Ele não comprova coleta completa dos 24 TRTs nem a exatidão da classificação nos tribunais em que o detalhe estiver acessível. Não habilite o serviço diário antes de conferir manualmente uma amostra dos detalhes e executar uma descoberta nacional sem limites em um ambiente com acesso estável ao JTe.
 
 ---
 
@@ -566,15 +609,15 @@ cd backend && npm run build && sudo systemctl restart jte-api
 
 | Método | Endpoint | Query | Autenticação |
 |---|---|---|---|
-| GET | `/api/processos` | `vara, dataInicio, dataFim, numero, reclamada, pagina` | Bearer JWT |
-| GET | `/api/processos/stats` | — | — |
+| GET | `/api/processos` | `tribunal, vara, dataInicio, dataFim, numero, reclamada, pagina` | Bearer JWT; TRT-2 por padrão; resposta inclui `tribunais` e `varas` do tribunal selecionado |
+| GET | `/api/processos/stats` | `tribunal` | —; TRT-2 por padrão |
 
 ### Alertas (premium)
 
 | Método | Endpoint | Body | Autenticação |
 |---|---|---|---|
 | GET    | `/api/alertas` | — | Bearer JWT + tier premium |
-| POST   | `/api/alertas` | `{nome, vara?, reclamada?}` | Bearer JWT + tier premium |
+| POST   | `/api/alertas` | `{nome, tribunal?, regiao?, vara?, reclamada?}` | Bearer JWT + tier premium; TRT-2 e região de São Paulo por padrão |
 | DELETE | `/api/alertas/:id` | — | Bearer JWT + tier premium |
 | PATCH  | `/api/alertas/:id/toggle` | — | Bearer JWT + tier premium |
 
@@ -607,6 +650,10 @@ cd backend && npm run build && sudo systemctl restart jte-api
 | `REDIS_PORT` | — | `6379` | Porta Redis |
 | `CONCURRENCY` | — | `4` | Workers paralelos |
 | `MESES` | — | `6` | Meses à frente para coletar |
+| `TRT` | — | `TRT2 - São Paulo` | Tribunal conforme o JTe |
+| `REGIAO` | — | `São Paulo - Zonas Central, Norte e Oeste` | Cidade/região conforme o JTe |
+| `VARAS` | — | `0` | Limite de varas; zero coleta todas |
+| `DATA_INICIO`, `DATA_FIM` | — | — | Intervalo piloto em `DD/MM/AAAA`; informe ambas |
 
 ### `frontend/.env.local`
 
@@ -642,14 +689,14 @@ cd frontend && npm run build && sudo systemctl restart jte-frontend
 mysql -u jte -p jte
 
 # Últimos processos
-SELECT vara, dataBR, reclamante, reclamada
+SELECT tribunal, regiao, vara, dataBR, reclamante, reclamada
 FROM processos_sem_polo_passivo
 ORDER BY createdAt DESC LIMIT 20;
 
 # Contagem por vara
-SELECT vara, COUNT(*) AS total
+SELECT tribunal, vara, COUNT(*) AS total
 FROM processos_sem_polo_passivo
-GROUP BY vara ORDER BY total DESC;
+GROUP BY tribunal, vara ORDER BY total DESC;
 
 # Usuários
 SELECT id, nome, email, tier, createdAt FROM users;

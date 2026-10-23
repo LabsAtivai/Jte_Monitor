@@ -225,6 +225,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
   const [dados, setDados]         = useState(null);
   const [loading, setLoading]     = useState(false);
   const [vara, setVara]           = useState("");
+  const [tribunal, setTribunal]   = useState("TRT2 - São Paulo");
   const [numero, setNumero]       = useState("");
   const [reclamada, setReclamada] = useState("");
   const [dataIni, setDataIni]     = useState("");
@@ -237,6 +238,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
     setLoading(true);
     try {
       const q = new URLSearchParams();
+      q.set("tribunal", tribunal);
       if (vara)         q.set("vara", vara);
       if (numeroDeb)    q.set("numero", numeroDeb);
       if (reclamadaDeb) q.set("reclamada", reclamadaDeb);
@@ -247,9 +249,9 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
       const json = await res.json();
       setDados(json); setPagina(pg);
     } finally { setLoading(false); }
-  }, [vara, numeroDeb, reclamadaDeb, dataIni, dataFim, authFetch]);
+  }, [tribunal, vara, numeroDeb, reclamadaDeb, dataIni, dataFim, authFetch]);
 
-  useEffect(() => { buscar(1); }, [vara, numeroDeb, reclamadaDeb, dataIni, dataFim]);
+  useEffect(() => { buscar(1); }, [tribunal, vara, numeroDeb, reclamadaDeb, dataIni, dataFim]);
 
   const rows = dados?.rows ?? [];
 
@@ -265,6 +267,9 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
       {/* Filtros */}
       <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8, padding: "18px 20px", marginBottom: 20 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12, marginBottom: 12 }}>
+          <FiltroSelect label="Tribunal" value={tribunal} onChange={e => { setTribunal(e.target.value); setVara(""); }}>
+            {[...new Set(["TRT2 - São Paulo", ...(dados?.tribunais ?? [])])].map(t => <option key={t} value={t}>{t}</option>)}
+          </FiltroSelect>
           <FiltroSelect label="Vara" value={vara} onChange={e => setVara(e.target.value)}>
             <option value="">Todas as varas</option>
             {dados?.varas?.map(v => <option key={v} value={v}>{v}</option>)}
