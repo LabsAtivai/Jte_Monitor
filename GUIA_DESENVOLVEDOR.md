@@ -32,8 +32,8 @@ suporte, corrigir bugs e implementar novas features com segurança.
 ## 1. O que o produto faz
 
 O JTe Monitor (marca comercial **Ativa.LAW**) é um SaaS jurídico que raspa a
-pauta pública do JTe (sistema de audiências do TRT-2 São Paulo, zonas Central,
-Norte e Oeste) e identifica **processos trabalhistas em que a reclamada ainda
+pauta pública do JTe (sistema de audiências dos TRTs — todos os TRTs
+disponíveis no JTe, 1º grau) e identifica **processos trabalhistas em que a reclamada ainda
 não tem advogado constituído no polo passivo** — ou seja, leads de captação de
 clientes para escritórios de advocacia.
 
@@ -59,7 +59,7 @@ atrás de **Nginx** fazendo proxy reverso + TLS (Let's Encrypt) em produção, o
 via **Docker Compose** (ver `docker-compose.yml`).
 
 ```
-JTe TRT-2 (site público)
+JTe TRTs (site público)
       │
       ▼
 Playwright (worker) ──► Fila Redis/BullMQ ──► N workers paralelos
@@ -283,19 +283,37 @@ idealmente, formalize a migration que falta.
 NestJS**, roda com `node worker/index.js` (via cron, `screen`/`tmux`, ou
 manual). Ele:
 
-1. Abre um browser Playwright, navega até `jte.csjt.jus.br`, seleciona
-   TRT-2 SP / zonas Central-Norte-Oeste, e lista todas as varas (unidades)
-   disponíveis (`listarVaras`).
+1. Abre um browser Playwright, navega até `jte.csjt.jus.br`, lista os TRTs
+   (`listarTRTs`), e para cada um lista municípios e varas
+   (`listarUnidades`, 1 página por TRT), sempre em "Audiências 1º grau".
+   Municípios "Tribunal Regional do Trabalho da Nª Região" são ignorados
+   (só têm gabinetes de 2º grau).
+   Falha em um TRT/município é logada e pulada, não derruba a execução.
+   `abrirPauta` concentra a navegação até a seleção de unidade.
 2. Gera uma lista de datas úteis (seg-sex) para os próximos `MESES` meses.
-3. Enfileira um job BullMQ por combinação vara×data (`--only-queue` só faz
-   isso).
+3. Enfileira um job BullMQ por combinação TRT×município×vara×data
+   (`--only-queue` só faz isso).
 4. `CONCURRENCY` workers consomem a fila em paralelo, cada um com seu próprio
    browser Chromium. Cada job (`processarJob`) navega até a vara/data,
    extrai a lista de processos da pauta, **abre o detalhe de cada processo
    para verificar se há advogado no polo passivo** (`semAdvogado` — isso é
    caro: 1 navegação extra por processo) e só salva os que não têm.
 5. Grava no MySQL com `INSERT ... ON DUPLICATE KEY UPDATE` — reexecutar o
-   worker é seguro, nunca duplica (chave única `vara+dataISO+numeroProcesso`).
+   worker é seguro, nunca duplica (chave única `trt+vara+dataISO+numeroProcesso`, migration `005_trt.sql`).
+
+Rodando por TRT / escalonado:
+
+- `TRTS=2,15 node worker/index.js` processa só esses TRTs e usa uma fila
+  BullMQ própria (`jte-trt-2-15`), então o `obliterate` não apaga jobs de
+  outras rotinas. Sem `TRTS`, roda todos os TRTs (fila `jte`). Ao separar
+  `--only-queue` e `--only-work`, use o mesmo valor de `TRTS` nos dois.
+- `MUNICIPIOS=N` limita N municípios por TRT e `VARAS=N` limita N varas por
+  município (testes).
+- Rodar todos os TRTs numa execução única pode levar muitas horas (SP sozinho
+  leva 30–40 min). Se ficar inviável, evoluções possíveis: crons escalonados
+  por grupo de TRTs; coleta incremental (janela curta diária + completa
+  semanal); não reabrir o detalhe de processos já classificados; vários
+  hosts com `--only-work` no mesmo Redis; priorizar TRTs com mais leads.
 
 Pontos importantes para quem for mexer aqui:
 

@@ -174,7 +174,7 @@ export default function LoginPage() {
         </h2>
         <p style={{ fontSize: 14, color: "#666", lineHeight: 1.7, maxWidth: 340, margin: 0 }}>
           {modo === "login"
-            ? "Entre na plataforma e acesse os leads do seu tribunal."
+            ? "Entre na plataforma e acesse os leads dos TRTs de todo o país."
             : "Cadastre-se para ter acesso completo. Após o cadastro, escolha o plano e comece a receber leads."}
         </p>
 

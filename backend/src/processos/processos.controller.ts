@@ -18,8 +18,8 @@ export class ProcessosController {
   @Get()
   async listar(
     @CurrentUser() user: User,
+    @Query("trt")        trt        = "",
     @Query("vara")       vara       = "",
-    @Query("tribunal")   tribunal   = "TRT2 - São Paulo",
     @Query("dataInicio") dataInicio = "",
     @Query("dataFim")    dataFim    = "",
     @Query("numero")     numero     = "",
@@ -33,7 +33,7 @@ export class ProcessosController {
     const cond: string[] = [];
     const p:    any[]    = [];
 
-    if (tribunal)  { cond.push("tribunal = ?");          p.push(tribunal); }
+    if (trt)        { cond.push("trt = ?");               p.push(trt); }
     if (vara)       { cond.push("vara = ?");              p.push(vara); }
     if (dataInicio) { cond.push("dataISO >= ?");          p.push(dataInicio); }
     if (dataFim)    { cond.push("dataISO <= ?");          p.push(dataFim); }
@@ -47,17 +47,19 @@ export class ProcessosController {
     );
 
     const [rows] = await this.db.query<any[]>(
-      `SELECT id,tribunal,regiao,vara,dataBR,dataISO,numeroProcesso,sessao,juiz,reclamante,reclamada,createdAt
+      `SELECT id,trt,municipio,vara,dataBR,dataISO,numeroProcesso,sessao,juiz,reclamante,reclamada,createdAt
        FROM processos_sem_polo_passivo ${where}
-       ORDER BY dataISO ASC, vara ASC LIMIT ? OFFSET ?`,
+       ORDER BY dataISO ASC, trt ASC, vara ASC LIMIT ? OFFSET ?`,
       [...p, limite, offset]
     );
 
-    const [varas] = await this.db.query<any[]>(
-      "SELECT DISTINCT vara FROM processos_sem_polo_passivo WHERE tribunal=? ORDER BY vara", [tribunal]
+    const [trts] = await this.db.query<any[]>(
+      "SELECT DISTINCT trt FROM processos_sem_polo_passivo ORDER BY CAST(SUBSTRING(trt, 4) AS UNSIGNED)"
     );
-    const [tribunais] = await this.db.query<any[]>(
-      "SELECT DISTINCT tribunal FROM processos_sem_polo_passivo ORDER BY tribunal"
+
+    const [varas] = await this.db.query<any[]>(
+      `SELECT DISTINCT vara FROM processos_sem_polo_passivo ${trt ? "WHERE trt = ?" : ""} ORDER BY vara`,
+      trt ? [trt] : []
     );
 
     // Recursos exclusivos premium
@@ -74,8 +76,8 @@ export class ProcessosController {
       total:        totalReal,
       pagina,
       totalPaginas: Math.ceil(totalReal / limite),
+      trts:         trts.map((t: any) => t.trt),
       varas:        varas.map((v: any) => v.vara),
-      tribunais:    tribunais.map((t: any) => t.tribunal),
       tier:         user.tier,
       isPremium,
       ...extras,
@@ -83,15 +85,16 @@ export class ProcessosController {
   }
 
   @Get("stats")
-  async stats(@Query("tribunal") tribunal = "TRT2 - São Paulo") {
+  async stats() {
     const [[row]] = await this.db.query<any>(`
       SELECT
         COUNT(*)              AS total,
-        COUNT(DISTINCT vara)  AS totalVaras,
+        COUNT(DISTINCT trt)   AS totalTrts,
+        COUNT(DISTINCT trt, vara) AS totalVaras,
         MIN(dataISO)          AS dataMin,
         MAX(dataISO)          AS dataMax,
         (SELECT iniciadoEm FROM execucoes ORDER BY id DESC LIMIT 1) AS ultimaExecucao
-      FROM processos_sem_polo_passivo WHERE tribunal=?`, [tribunal]
+      FROM processos_sem_polo_passivo`
     );
     return row;
   }

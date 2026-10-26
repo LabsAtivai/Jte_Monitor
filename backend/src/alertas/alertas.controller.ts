@@ -1,5 +1,5 @@
 // backend/src/alertas/alertas.service.ts
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { DbService } from "../common/db.service";
 import * as nodemailer from "nodemailer";
@@ -23,15 +23,12 @@ export class AlertasService {
     ).then(([r]) => r);
   }
 
-  async criar(userId: number, dto: { nome: string; tribunal?: string; regiao?: string; vara?: string; reclamada?: string }) {
-    const tribunal = dto.tribunal || "TRT2 - São Paulo";
-    const regiao = dto.regiao || (tribunal === "TRT2 - São Paulo" ? "São Paulo - Zonas Central, Norte e Oeste" : "");
-    if (!regiao) throw new BadRequestException("Informe a região ao criar alerta para outro tribunal.");
+  async criar(userId: number, dto: { nome: string; vara?: string; reclamada?: string }) {
     const [r] = await this.db.query<any>(
-      "INSERT INTO alertas (userId,nome,tribunal,regiao,vara,reclamada) VALUES (?,?,?,?,?,?)",
-      [userId, dto.nome, tribunal, regiao, dto.vara||null, dto.reclamada||null]
+      "INSERT INTO alertas (userId,nome,vara,reclamada) VALUES (?,?,?,?)",
+      [userId, dto.nome, dto.vara||null, dto.reclamada||null]
     );
-    return { id: r.insertId, ...dto, tribunal, regiao, userId, ativo: true };
+    return { id: r.insertId, ...dto, userId, ativo: true };
   }
 
   async remover(userId: number, id: number) {
@@ -62,8 +59,6 @@ export class AlertasService {
     let enviados = 0;
     for (const alerta of alertas) {
       const batem = processos.filter(p =>
-        p.tribunal === alerta.tribunal &&
-        p.regiao === alerta.regiao &&
         (!alerta.vara      || p.vara === alerta.vara) &&
         (!alerta.reclamada || p.reclamada?.toLowerCase().includes(alerta.reclamada.toLowerCase()))
       );
@@ -85,7 +80,7 @@ export class AlertasService {
       }
 
       const linhas = novos.map((p: any) =>
-        `• ${p.numeroProcesso}\n  Tribunal: ${p.tribunal}\n  Região: ${p.regiao}\n  Vara: ${p.vara}\n  Audiência: ${p.dataBR}\n  Reclamante: ${p.reclamante||"-"}\n  Reclamada: ${p.reclamada||"-"}`
+        `• ${p.numeroProcesso}\n  Vara: ${p.vara}\n  Audiência: ${p.dataBR}\n  Reclamante: ${p.reclamante||"-"}\n  Reclamada: ${p.reclamada||"-"}`
       ).join("\n\n");
 
       await this.mailer.sendMail({
