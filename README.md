@@ -1,6 +1,6 @@
 # JTe Monitor
 
-Plataforma SaaS para monitorar processos trabalhistas sem polo passivo — TRT-2 São Paulo (Zonas Central, Norte e Oeste).
+Plataforma SaaS para monitorar processos trabalhistas sem polo passivo — todos os TRTs disponíveis no JTe (1º grau).
 
 ---
 
@@ -27,7 +27,7 @@ Plataforma SaaS para monitorar processos trabalhistas sem polo passivo — TRT-2
 ## 1. Visão geral
 
 ```
-JTe TRT-2 (fonte pública)
+JTe TRTs (fonte pública)
         │
         ▼
   Scraper Playwright ──► Fila Redis (BullMQ) ──► 4 Workers paralelos
@@ -493,8 +493,10 @@ crontab -e
 
 Adicione:
 ```cron
-# Worker JTe: seg–sex às 06h
+# Worker JTe: seg–sex às 06h (todos os TRTs; pode levar muitas horas)
 0 6 * * 1-5 cd /opt/jte-monitor/backend && node worker/index.js >> /var/log/jte/worker.log 2>&1
+# Alternativa escalonada por grupo de TRTs:
+# 0 20 * * 1-5 cd /opt/jte-monitor/backend && TRTS=1,2,3,4,5,6 node worker/index.js >> /var/log/jte/worker-a.log 2>&1
 ```
 
 Verifique:
@@ -607,6 +609,9 @@ cd backend && npm run build && sudo systemctl restart jte-api
 | `REDIS_PORT` | — | `6379` | Porta Redis |
 | `CONCURRENCY` | — | `4` | Workers paralelos |
 | `MESES` | — | `6` | Meses à frente para coletar |
+| `TRTS` | — | todos | Lista de números de TRT (ex.: `2,15`); usa fila própria |
+| `MUNICIPIOS` | — | todos | Limita N municípios por TRT (teste) |
+| `VARAS` | — | todas | Limita N varas por município (teste) |
 
 ### `frontend/.env.local`
 

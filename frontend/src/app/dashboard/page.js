@@ -224,6 +224,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
   }
   const [dados, setDados]         = useState(null);
   const [loading, setLoading]     = useState(false);
+  const [trt, setTrt]             = useState("");
   const [vara, setVara]           = useState("");
   const [numero, setNumero]       = useState("");
   const [reclamada, setReclamada] = useState("");
@@ -237,6 +238,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
     setLoading(true);
     try {
       const q = new URLSearchParams();
+      if (trt)          q.set("trt", trt);
       if (vara)         q.set("vara", vara);
       if (numeroDeb)    q.set("numero", numeroDeb);
       if (reclamadaDeb) q.set("reclamada", reclamadaDeb);
@@ -247,9 +249,9 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
       const json = await res.json();
       setDados(json); setPagina(pg);
     } finally { setLoading(false); }
-  }, [vara, numeroDeb, reclamadaDeb, dataIni, dataFim, authFetch]);
+  }, [trt, vara, numeroDeb, reclamadaDeb, dataIni, dataFim, authFetch]);
 
-  useEffect(() => { buscar(1); }, [vara, numeroDeb, reclamadaDeb, dataIni, dataFim]);
+  useEffect(() => { buscar(1); }, [trt, vara, numeroDeb, reclamadaDeb, dataIni, dataFim]);
 
   const rows = dados?.rows ?? [];
 
@@ -265,6 +267,10 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
       {/* Filtros */}
       <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8, padding: "18px 20px", marginBottom: 20 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12, marginBottom: 12 }}>
+          <FiltroSelect label="TRT" value={trt} onChange={e => { setTrt(e.target.value); setVara(""); }}>
+            <option value="">Todos os TRTs</option>
+            {dados?.trts?.map(t => <option key={t} value={t}>{t}</option>)}
+          </FiltroSelect>
           <FiltroSelect label="Vara" value={vara} onChange={e => setVara(e.target.value)}>
             <option value="">Todas as varas</option>
             {dados?.varas?.map(v => <option key={v} value={v}>{v}</option>)}
@@ -274,7 +280,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
           <FiltroInput label="Audiência de"  type="date" value={dataIni} onChange={e => setDataIni(e.target.value)} />
           <FiltroInput label="Audiência até" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
         </div>
-        <BtnSecundario onClick={() => { setVara(""); setNumero(""); setReclamada(""); setDataIni(""); setDataFim(""); }}>
+        <BtnSecundario onClick={() => { setTrt(""); setVara(""); setNumero(""); setReclamada(""); setDataIni(""); setDataFim(""); }}>
           Limpar filtros
         </BtnSecundario>
       </div>
@@ -294,7 +300,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    {["Vara", "Audiência", "Processo", "Reclamante", "Empresa (Reclamada)", "Juiz(a)"].map(h => (
+                    {["TRT", "Vara", "Audiência", "Processo", "Reclamante", "Empresa (Reclamada)", "Juiz(a)"].map(h => (
                       <th key={h} style={{ padding: "10px 14px", textAlign: "left", background: C.black, fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `2px solid ${C.orange}`, whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -302,6 +308,7 @@ function AbaProcessos({ authFetch, user, isPremium, router }) {
                 <tbody>
                   {rows.map((r, i) => (
                     <tr key={r.id} style={{ background: i % 2 === 0 ? "#fff" : "#FAFAFA" }}>
+                      <td style={{ ...TD, fontSize: 11, color: C.textSub }}>{r.trt}</td>
                       <td style={{ ...TD, fontSize: 11, color: C.textSub }}>{r.vara}</td>
                       <td style={{ ...TD, whiteSpace: "nowrap", fontWeight: 600, color: C.orange }}>{r.dataBR}</td>
                       <td style={{ ...TD, fontFamily: "monospace", fontSize: 12 }}>{r.numeroProcesso}</td>

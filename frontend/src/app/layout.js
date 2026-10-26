@@ -2,7 +2,7 @@ import { AuthProvider } from "@/lib/auth";
 
 export const metadata = {
   title: "Ativa.LAW",
-  description: "Processos sem polo passivo — TRT-2 SP",
+  description: "Processos sem polo passivo — TRTs (Justiça do Trabalho)",
 };
 
 export default function RootLayout({ children }) {
