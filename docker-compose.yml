@@ -25,7 +25,7 @@ services:
       MAIL_FROM: "JTe Monitor <noreply@ativa.law>"
       PORT: 4000
       NODE_ENV: production
-      FRONTEND_URL: https://law.ativa.ai
+      FRONTEND_URL:  https://sistema.ativa.ai
       REDIS_HOST: 172.17.0.1
       REDIS_PORT: 6379
       SNOV_CLIENT_ID: ${SNOV_CLIENT_ID}
